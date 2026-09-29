@@ -24,7 +24,7 @@ Runs locally: a command-line script and a small web app on `http://127.0.0.1:800
 Requires Python 3.10+.
 
 ```bash
-git clone <this repo>
+git clone https://github.com/EinggrauMFW/refcollector.git
 cd refcollector
 pip install -r requirements.txt
 ```
