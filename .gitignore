@@ -1,0 +1,25 @@
+# Papers and anything derived from them (copyright / privacy)
+*.pdf
+webapp/library/
+webapp/data/
+output/
+test_out*/
+tests/out/
+tests/*.log
+*.log
+
+# Local secrets and settings (contain your email)
+.env
+config.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

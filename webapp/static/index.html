@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refcollector</title>
+<style>
+  :root { --bg:#f7f7f5; --card:#fff; --ink:#1c1c1a; --mute:#6b6b66; --line:#e3e3de; --accent:#2457c5; --ok:#1f7a45; --warn:#b26a00; --bad:#b3261e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161615; --card:#1f1f1e; --ink:#ececea; --mute:#9a9a94; --line:#333330; --accent:#7aa2ff; --ok:#5cc88a; --warn:#e7a44c; --bad:#f2837b; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:16px; margin:0 0 12px; }
+  .sub { color:var(--mute); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:end; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--mute); flex:1; min-width:200px; }
+  input[type=text], input[type=email], input[type=file], textarea { font:inherit; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); width:100%; }
+  button, .btn { font:inherit; padding:8px 14px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; text-decoration:none; display:inline-block; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  .chk { flex-direction:row; align-items:center; color:var(--ink); min-width:0; flex:none; white-space:nowrap; padding-bottom:9px; }
+  .chk input { width:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--mute); }
+  tr.main { cursor:pointer; } tr.main:hover { background:var(--bg); }
+  .pill { font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid currentColor; white-space:nowrap; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); } .mute { color:var(--mute); }
+  .detail { background:var(--bg); padding:14px 16px !important; }
+  .detail h3 { font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--mute); margin:12px 0 4px; }
+  .detail p { margin:0 0 4px; }
+  .tabs { display:flex; gap:6px; margin:12px 0; flex-wrap:wrap; }
+  .tabs button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:8px 0; }
+  .bar div { height:100%; background:var(--accent); transition:width .3s; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+  a { color:var(--accent); }
+  .msg { color:var(--bad); margin-top:8px; min-height:1em; }
+  textarea.draft { height:190px; font-size:13px; }
+  .list-item { display:flex; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Refcollector</h1>
+  <p class="sub">Extract a PDF's reference list, resolve full metadata, download open-access PDFs, and draft requests for paywalled ones.</p>
+
+  <div class="card" id="settingsCard">
+    <h2>Settings</h2>
+    <div class="row">
+      <label>Your email (used for Unpaywall / OpenAlex — required)
+        <input type="email" id="s_email" placeholder="you@university.edu"></label>
+      <label>Your name (for request emails)
+        <input type="text" id="s_name"></label>
+      <label>Affiliation
+        <input type="text" id="s_aff" placeholder="e.g. MSc student, University of X"></label>
+      <label>Purpose
+        <input type="text" id="s_purpose"></label>
+      <label style="flex-basis:100%">Library folder (leave empty for the default)
+        <input type="text" id="s_lib" placeholder="e.g. D:\Papers\Library"></label>
+      <label>OpenAlex API key (free — lifts its daily limit)
+        <input type="password" id="s_oa" autocomplete="off"></label>
+      <label>Semantic Scholar API key (optional)
+        <input type="password" id="s_s2" autocomplete="off"></label>
+      <button class="primary" id="saveSettings">Save</button>
+    </div>
+    <div class="msg" id="settingsMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>New job</h2>
+    <div class="row">
+      <label>Thesis / paper PDF <input type="file" id="file" accept="application/pdf"></label>
+      <label class="chk"><input type="checkbox" id="dl" checked> Download open-access PDFs</label>
+      <button class="primary" id="start">Start</button>
+    </div>
+    <div class="msg" id="startMsg"></div>
+  </div>
+
+  <div class="card" id="jobsCard">
+    <h2>Jobs</h2>
+    <div id="jobs" class="mute">None yet.</div>
+  </div>
+
+  <div id="jobView"></div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let settings = {}, current = null, job = null, filter = 'all', open = new Set(), timer = null;
+
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+  return r.json();
+}
+
+// ---- settings ----
+async function loadSettings() {
+  settings = await api('/api/settings');
+  $('#s_email').value = settings.email; $('#s_name').value = settings.sender_name;
+  $('#s_aff').value = settings.affiliation; $('#s_purpose').value = settings.purpose;
+  $('#s_lib').value = settings.library_dir; $('#s_lib').placeholder = settings.library_effective;
+  $('#s_oa').placeholder = settings.openalex_key_set ? 'saved — leave empty to keep' : 'not set';
+  $('#s_s2').placeholder = settings.s2_key_set ? 'saved — leave empty to keep' : 'not set';
+}
+$('#saveSettings').onclick = async () => {
+  const body = { email:$('#s_email').value.trim(), sender_name:$('#s_name').value.trim(),
+                 affiliation:$('#s_aff').value.trim(), purpose:$('#s_purpose').value.trim(),
+                 library_dir:$('#s_lib').value.trim(),
+                 openalex_key:$('#s_oa').value.trim(), s2_key:$('#s_s2').value.trim() };
+  try {
+    await api('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    settings = body; $('#settingsMsg').textContent = 'Saved.'; $('#settingsMsg').className = 'msg ok';
+    if (job) render();
+  } catch (e) { $('#settingsMsg').textContent = e.message; $('#settingsMsg').className = 'msg bad'; }
+};
+
+// ---- jobs ----
+$('#start').onclick = async () => {
+  const f = $('#file').files[0];
+  if (!f) { $('#startMsg').textContent = 'Choose a PDF.'; return; }
+  const fd = new FormData(); fd.append('file', f); fd.append('download', $('#dl').checked);
+  $('#startMsg').textContent = '';
+  try { const {id} = await api('/api/jobs', {method:'POST', body:fd}); select(id); refreshJobs(); }
+  catch (e) { $('#startMsg').textContent = e.message; }
+};
+
+async function refreshJobs() {
+  const list = await api('/api/jobs');
+  $('#jobs').innerHTML = list.length ? list.map(j => `
+    <div class="list-item" onclick="select('${j.id}')">
+      <span>${esc(j.title)} <span class="mute">· ${j.resolved}/${j.total} resolved</span></span>
+      <span class="pill ${j.status==='done'?'ok':j.status==='error'||j.status==='interrupted'?'bad':'warn'}">${j.status}</span>
+    </div>`).join('') : 'None yet.';
+}
+
+function select(id) { current = id; open.clear(); filter = 'all'; poll(); }
+
+async function poll() {
+  clearTimeout(timer);
+  if (!current) return;
+  try { job = await api('/api/jobs/' + current); } catch { return; }
+  render();
+  refreshJobs();
+  if (['queued','extracting','resolving'].includes(job.status)) timer = setTimeout(poll, 2000);
+}
+
+// ---- rendering ----
+const isRes = r => r.status === 'resolved';
+const FILTERS = {
+  all: r => true,
+  resolved: r => isRes(r),
+  unresolved: r => !isRes(r) && r.status !== 'pending',
+  pdf: r => r.pdf_status === 'downloaded',
+  paywalled: r => r.pdf_status === 'paywalled',
+  review: r => r.confidence === 'review',
+};
+
+function render() {
+  const refs = job.refs, done = refs.filter(r => r.status !== 'pending').length;
+  const cnt = k => refs.filter(FILTERS[k]).length;
+  let h = `<div class="card"><h2>${esc(job.title || job.name)} <span class="mute">· ${job.status}</span></h2>
+    ${job.folder ? `<p class="mute">Folder: ${esc(job.folder)}</p>` : ''}`;
+  if (job.error) h += `<p class="bad">${esc(job.error)}</p>`;
+  for (const w of job.warnings || []) h += `<p class="warn">⚠ ${esc(w)} Some references may be unresolved only because of this — add a free API key in Settings and re-run.</p>`;
+  if (refs.length) h += `<div class="bar"><div style="width:${done/refs.length*100}%"></div></div>
+    <p class="mute">${done}/${refs.length} processed · ${cnt('resolved')} resolved · ${cnt('pdf')} PDFs · ${cnt('paywalled')} paywalled · ${cnt('unresolved')} unresolved</p>`;
+  h += `<div class="actions">
+      <button onclick="openFolder()">Open folder</button>
+      <a class="btn" href="/api/jobs/${job.id}/references.bib">BibTeX</a>
+      <a class="btn" href="/api/jobs/${job.id}/references.csl.json" title="Lossless import into Zotero / Mendeley">CSL JSON</a>
+      <a class="btn" href="/api/jobs/${job.id}/references.csv">CSV (full detail)</a>
+      <a class="btn" href="/api/jobs/${job.id}/references.json">JSON</a>
+      <a class="btn" href="/api/jobs/${job.id}/pdfs.zip">PDFs (zip)</a>
+      <button onclick="allDrafts()">Export all paywall request drafts</button>
+      <button onclick="del()">Delete job</button></div>
+    <div class="tabs">${Object.keys(FILTERS).map(k => `<button class="${filter===k?'on':''}" onclick="setFilter('${k}')">${k} (${cnt(k)})</button>`).join('')}</div>
+    <table><thead><tr><th>#</th><th>Title</th><th>Authors</th><th>Year</th><th>Cited by</th><th>PDF</th></tr></thead><tbody>`;
+  for (const r of refs.filter(FILTERS[filter])) {
+    const m = r.meta, d = r.details;
+    const pdf = r.pdf_status === 'downloaded' ? '<span class="pill ok">downloaded</span>'
+      : r.pdf_status === 'paywalled' ? '<span class="pill warn">paywalled</span>'
+      : r.status === 'unresolved' ? '<span class="pill bad">unresolved</span>'
+      : r.status === 'pending' ? '<span class="pill mute">pending</span>' : '<span class="pill mute">skipped</span>';
+    h += `<tr class="main" onclick="toggle(${r.i})"><td>${r.i+1}</td>
+      <td>${esc(m ? m.title : r.raw.slice(0, 110))}${r.duplicate ? ' <span class="mute">(duplicate)</span>' : ''}${r.confidence === 'review' ? ` <span class="pill warn" title="${esc((m.flags || []).join('; '))}">review</span>` : ''}${r.confidence === 'link' ? ' <span class="pill mute">web source</span>' : ''}</td>
+      <td>${esc(m ? (m.authors.slice(0,2).map(a => a.split(',')[0]).join(', ') + (m.authors.length>2?' et al.':'')) : '')}</td>
+      <td>${esc(m?.year)}</td><td>${esc(d?.cited_by_count ?? '')}</td><td>${pdf}</td></tr>`;
+    if (open.has(r.i)) h += `<tr><td colspan="6" class="detail">${detail(r)}</td></tr>`;
+  }
+  h += '</tbody></table></div>';
+  $('#jobView').innerHTML = h;
+}
+
+function detail(r) {
+  const m = r.meta, d = r.details;
+  let h = `<h3>Raw reference</h3><p class="mute">${esc(r.raw)}</p>`;
+  if (!m) return h + `<h3>Fix manually</h3><div class="row"><label>Known DOI
+    <input type="text" id="fix${r.i}" placeholder="10.xxxx/xxxxx"></label>
+    <button onclick="fixDoi(${r.i})">Look up</button></div><div class="msg" id="fixmsg${r.i}"></div>`;
+  h += `<h3>How it was matched</h3><p>${esc(r.method)} · ${esc((m.sources || []).join(' + ') || '—')} · confidence: <b class="${r.confidence==='high'?'ok':r.confidence==='review'?'warn':'mute'}">${esc(r.confidence)}</b></p>
+    ${m.check ? `<p class="mute">title match ${Math.round(m.check.title_score*100)}%${m.check.author_overlap!=null ? ' · authors found ' + Math.round(m.check.author_overlap*100) + '%' : ''}${m.check.year_delta!=null ? ' · year off by ' + m.check.year_delta : ''}</p>` : ''}
+    ${(m.flags || []).map(f => `<p class="warn">⚠ ${esc(f)}</p>`).join('')}
+    <h3>Title</h3><p>${esc(m.title)}</p>
+    <h3>Publication</h3><p>${esc(m.venue)} ${m.volume ? 'vol. ' + esc(m.volume) : ''} ${m.issue ? '(' + esc(m.issue) + ')' : ''} ${m.pages ? 'pp. ' + esc(m.pages) : ''} · ${esc(m.year)} · ${esc(m.publisher)} · <span class="mute">${esc(m.type)}</span></p>
+    <h3>DOI / links</h3><p><a href="https://doi.org/${esc(m.doi)}" target="_blank" rel="noopener">${esc(m.doi)}</a>
+      ${d.openalex_id ? ` · <a href="${esc(d.openalex_id)}" target="_blank" rel="noopener">OpenAlex</a>` : ''}
+      ${d.issn.length ? ' · ISSN ' + esc(d.issn.join(', ')) : ''}
+      ${r.pdf ? ` · <a href="/api/jobs/${job.id}/pdfs/${encodeURIComponent(r.pdf)}" target="_blank">Open PDF</a>` : ''}</p>
+    <h3>Authors</h3>` + (d.author_details.length
+      ? d.author_details.map(a => `<p>${esc(a.name)} <span class="mute">${esc(a.institutions.join('; '))}${a.orcid ? ' · <a href="'+esc(a.orcid)+'" target="_blank" rel="noopener">ORCID</a>' : ''}</span></p>`).join('')
+      : `<p>${esc(m.authors.join('; '))}</p>`);
+  h += `<h3>Metrics</h3><p>Cited by ${esc(d.cited_by_count ?? d.crossref_cited_by ?? '—')} · references ${esc(d.referenced_works_count ?? '—')} · OA: ${esc(d.oa_status ?? '—')}${d.language ? ' · lang ' + esc(d.language) : ''}</p>`;
+  if (d.topics.length || d.keywords.length || d.subjects.length)
+    h += `<h3>Topics / keywords</h3><p>${esc([...d.topics, ...d.keywords, ...d.subjects].join(' · '))}</p>`;
+  if (d.abstract) h += `<h3>Abstract</h3><p>${esc(d.abstract)}</p>`;
+  if (r.pdf_status === 'paywalled') h += requestBox(r);
+  return h;
+}
+
+// ---- paywall request emails ----
+function draft(r) {
+  const m = r.meta, d = r.details;
+  const first = d.author_details[0]?.name || m.authors[0] || 'Author';
+  const last = first.includes(',') ? first.split(',')[0] : first.split(' ').slice(-1)[0];
+  const who = [settings.sender_name, settings.affiliation].filter(Boolean).join(', ');
+  const subject = `Request for a copy of your paper: "${m.title}"`;
+  const body = `Dear Dr. ${last},
+
+${who ? 'My name is ' + who + '. ' : ''}I am reading your paper "${m.title}" (${m.venue}, ${m.year}; DOI ${m.doi}) for ${settings.purpose || 'my academic research'}, but I do not have subscription access to it.
+
+Would you be able to send me a PDF copy for personal study? I would be very grateful, and I will of course cite the work appropriately.
+
+Thank you for your time.
+
+Kind regards,
+${settings.sender_name || ''}`;
+  return {subject, body};
+}
+function requestBox(r) {
+  const {subject, body} = draft(r), d = r.details;
+  const authors = d.author_details.map(a => a.name + (a.institutions[0] ? ' (' + a.institutions[0] + ')' : '')).join('; ');
+  return `<h3>Request a copy from the authors</h3>
+    <p class="mute">Emails aren't in Crossref/OpenAlex. Look up the corresponding author on the <a href="https://doi.org/${esc(r.meta.doi)}" target="_blank" rel="noopener">publisher page</a> (${esc(authors)}). Sending stays in your own mail app.</p>
+    <textarea class="draft" readonly>${esc('Subject: ' + subject + '\n\n' + body)}</textarea>
+    <div class="actions">
+      <a class="btn" href="mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}">Open in mail app</a>
+      <button onclick="copyDraft(${r.i})">Copy</button></div>`;
+}
+function copyDraft(i) {
+  const {subject, body} = draft(job.refs[i]);
+  navigator.clipboard.writeText('Subject: ' + subject + '\n\n' + body);
+}
+function allDrafts() {
+  const list = job.refs.filter(FILTERS.paywalled);
+  if (!list.length) return alert('No paywalled papers in this job.');
+  const text = list.map(r => { const d = draft(r); return `=== ${r.meta.doi} ===\nAuthors: ${r.details.author_details.map(a => a.name + (a.institutions[0] ? ' (' + a.institutions[0] + ')' : '')).join('; ') || r.meta.authors.join('; ')}\nSubject: ${d.subject}\n\n${d.body}\n`; }).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type:'text/plain'})); a.download = 'paywall_requests.txt'; a.click();
+}
+
+// ---- actions ----
+async function openFolder() { try { await api(`/api/jobs/${job.id}/open-folder`, {method:'POST'}); } catch (e) { alert(e.message); } }
+function setFilter(k) { filter = k; render(); }
+function toggle(i) { open.has(i) ? open.delete(i) : open.add(i); render(); }
+async function del() {
+  if (!confirm('Delete this job and its PDFs?')) return;
+  await api('/api/jobs/' + job.id, {method:'DELETE'}); job = null; current = null; $('#jobView').innerHTML = ''; refreshJobs();
+}
+async function fixDoi(i) {
+  const doi = $('#fix' + i).value.trim(); if (!doi) return;
+  $('#fixmsg' + i).textContent = 'Looking up…';
+  try { await api(`/api/jobs/${job.id}/refs/${i}/doi`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({doi})}); poll(); }
+  catch (e) { $('#fixmsg' + i).textContent = e.message; $('#fixmsg' + i).className = 'msg bad'; }
+}
+
+loadSettings(); refreshJobs();
+</script>
+</body>
+</html>
