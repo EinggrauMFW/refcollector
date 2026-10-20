@@ -13,10 +13,10 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 | 06 | identity | B | wp/06 | c2cce524-10b9-495f-b206-e2e58ba2e054 | merged | 459 passed in worktree; integration 739 passed | 3f6e51a, 110d41b + fix 8cdbe0b (no invented DOIs; unresolved per 9.1 step 7, D-31) |
 | 07 | access | B | wp/07 | 09a55586-2910-4752-8357-7ac15d93b5d8 | merged | 432 passed in worktree; integration 739 passed | 76073bb, d1e3a00; Sonnet review verdict MERGE |
 | 08 | files | B | wp/08 | 7404fcf8-4e0b-417a-a6a4-6d9cc670b465 | merged | 500 passed in worktree; integration 739 passed | bac12c3, d315d79 (DNS pinning), bd9034a (title match, off-loop verify, version reason, site-local) |
-| 09 | services | C | wp/09 | Sonnet subagent | dispatched | not run | brief: briefs/wp-09.md (D-32) |
+| 09 | services | C | wp/09 | reviewed by Codex | merged | initial independent 823 passed; corrected 841 passed; integration 938 passed | 1af065f + a0130ca + 0228b85; approval staleness, transactional preconditions, UTF-8 paging fixes |
 | 10 | pipeline | C | wp/10 | — | planned | not run | needs 01–09 |
-| 11 | mcp | C | wp/11 | Sonnet subagent | dispatched | not run | brief: briefs/wp-11.md (D-32) |
-| 12 | cli | C | wp/12 | Sonnet subagent | dispatched | not run | brief: briefs/wp-12.md (D-32) |
+| 11 | mcp | C | wp/11 | reviewed by Codex | merged | independent 764 passed; integration 938 passed | d4502dc; no confirmed review defect |
+| 12 | cli | C | wp/12 | reviewed by Codex | merged | initial independent 803 passed; corrected 811 passed; integration 938 passed | b222f87 + 88fca3c; terminal input and live-candidate paging fixes |
 | D | integration + acceptance | D | integration | orchestrator | planned | not run | |
 
 ## Orchestrator handoff - 2026-10-20
@@ -74,3 +74,21 @@ Known limits: `restricted` unreachable with P0 OA providers; OA locations not de
 managed reuse needs a detected version; strict `is_repaired` and octet-stream rejection;
 providers/files import cycle held by a lazy import.
 Next: Wave C (WP-09 services, WP-11 MCP, WP-12 CLI, then WP-10 pipeline).
+
+## Wave C completion - 2026-10-20
+
+Independent initial required checks: WP-09 823, WP-11 764, WP-12 803 passed.
+Separate reviewers checked each package against its brief and contracts.
+Confirmed defects received failing regressions before fixes:
+
+- Services: invalidate/audit approvals after shared metadata changes, DOI candidate replacement and approved-candidate rejection.
+- Services: validate job permissions/prerequisites in the write transaction; reject stale attachment evaluations.
+- Services: reject a UTF-8 chunk too small to make progress with an actionable INVALID_INPUT.
+- CLI: consume Windows extended-key suffix once; clear pending POSIX paste before a line prompt; page all live candidates with matching display and selection.
+
+Corrected full worktree checks: WP-09 841 passed; WP-12 811 passed. Second reviews found no remaining confirmed blocker.
+All three branches merged with --no-ff into integration. Root required check on e26389c:
+lint passed, 157 files formatted, 938 passed in 58.03s, check: all steps passed.
+Native terminal regression tests simulated the OS APIs; no real terminal session was tested.
+The earlier POSIX repeated-approval claim was not retained: setcbreak already flushes before the next key read.
+WP-10 brief is briefs/wp-10.md; dispatch follows from this verified source state. No push.
