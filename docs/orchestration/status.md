@@ -13,10 +13,10 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 | 06 | identity | B | wp/06 | c2cce524-10b9-495f-b206-e2e58ba2e054 | merged | 459 passed in worktree; integration 739 passed | 3f6e51a, 110d41b + fix 8cdbe0b (no invented DOIs; unresolved per 9.1 step 7, D-31) |
 | 07 | access | B | wp/07 | 09a55586-2910-4752-8357-7ac15d93b5d8 | merged | 432 passed in worktree; integration 739 passed | 76073bb, d1e3a00; Sonnet review verdict MERGE |
 | 08 | files | B | wp/08 | 7404fcf8-4e0b-417a-a6a4-6d9cc670b465 | merged | 500 passed in worktree; integration 739 passed | bac12c3, d315d79 (DNS pinning), bd9034a (title match, off-loop verify, version reason, site-local) |
-| 09 | services | C | wp/09 | — | planned | not run | needs 01 |
+| 09 | services | C | wp/09 | Sonnet subagent | dispatched | not run | brief: briefs/wp-09.md (D-32) |
 | 10 | pipeline | C | wp/10 | — | planned | not run | needs 01–09 |
-| 11 | mcp | C | wp/11 | — | planned | not run | fake service |
-| 12 | cli | C | wp/12 | — | planned | not run | fake service |
+| 11 | mcp | C | wp/11 | Sonnet subagent | dispatched | not run | brief: briefs/wp-11.md (D-32) |
+| 12 | cli | C | wp/12 | Sonnet subagent | dispatched | not run | brief: briefs/wp-12.md (D-32) |
 | D | integration + acceptance | D | integration | orchestrator | planned | not run | |
 
 ## Orchestrator handoff - 2026-10-20
