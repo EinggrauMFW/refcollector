@@ -101,7 +101,16 @@ class DefaultFileVerifier:
             }
         )
         title = _words(work.title or "")
-        title_match = bool(title and title == _words(title_text))
+        opening_words = _words(opening)
+        # Contiguous word run anywhere in the opening: tolerates a journal header, a DOI line
+        # before the title, or a title wrapped over several text blocks.
+        title_match = bool(title and f" {title} " in f" {opening_words} ")
+        title_words = set(title.split())
+        # Insufficient evidence (e.g. hyphenated line breaks) is not a conflict; a title whose
+        # words are mostly absent is clearly a different paper.
+        title_unclear = bool(title_words) and len(title_words & set(opening_words.split())) * 2 >= len(
+            title_words
+        )
         expected_doi = (work.doi or "").casefold().removeprefix("https://doi.org/").removeprefix("doi:")
         reasons = []
         conflict = False
@@ -114,7 +123,7 @@ class DefaultFileVerifier:
         if work.title:
             if not title_match:
                 reasons.append("TITLE_MISMATCH" if opening.strip() else "TITLE_EVIDENCE_MISSING")
-                conflict = bool(opening.strip()) or conflict
+                conflict = (bool(opening.strip()) and not title_unclear) or conflict
         if not expected_doi and not title:
             reasons.append("IDENTITY_EVIDENCE_MISSING")
         if re.search(

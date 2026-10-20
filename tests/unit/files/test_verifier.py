@@ -112,8 +112,57 @@ def test_truncated_repaired_pdf_fails(tmp_path):
 
 
 def test_requested_title_in_another_papers_opening_is_not_agreement(tmp_path):
-    result = verify(tmp_path, paper_pdf("A different study", [TITLE], DOI))
+    # Another paper's own (conflicting) primary DOI wins over a quoted title.
+    result = verify(tmp_path, paper_pdf("A different study", [TITLE], "10.4321/other"))
     assert result.state == RetrievalState.NEEDS_REVIEW and result.identity_match is False
+    assert "DOI_MISMATCH" in result.reasons
+    # No primary DOI at all: a quoted title alone does not verify when a DOI is expected.
+    result = verify(tmp_path, paper_pdf("A different study", [TITLE]))
+    assert result.state == RetrievalState.NEEDS_REVIEW and result.identity_match is not True
+
+
+def _page_one(*blocks):
+    """Page 1 with separate text blocks at fixed positions (10.4: header, wrapped title, DOI line)."""
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        for i, text in enumerate(blocks):
+            page.insert_text((56, 60 + 40 * i), text, fontsize=12)
+        doc.new_page().insert_text((56, 60), "Body text of the article.", fontsize=12)
+        return doc.tobytes()
+
+
+@pytest.mark.parametrize(
+    "blocks",
+    [
+        ("Journal of Ocean Engineering, vol. 12", TITLE, "A. Author", "https://doi.org/" + DOI),
+        ("Ocean wave energy", "converter control", "A. Author", "https://doi.org/" + DOI),
+        ("https://doi.org/" + DOI, TITLE, "A. Author"),
+    ],
+    ids=["journal_header", "wrapped_title", "doi_line_first"],
+)
+def test_title_found_anywhere_in_opening_verifies(tmp_path, blocks):
+    result = verify(tmp_path, _page_one(*blocks))
+    assert result.state == RetrievalState.VERIFIED, result.reasons
+    assert result.identity_match is True and result.evidence["title_match"] is True
+
+
+def test_title_on_page_two_opening_verifies_but_supplement_still_wins(tmp_path):
+    data = _page_one("Journal header", "https://doi.org/" + DOI)
+    with pymupdf.open(stream=data) as doc:
+        doc[1].insert_text((56, 100), TITLE, fontsize=12)
+        data = doc.tobytes()
+    assert verify(tmp_path, data).state == RetrievalState.VERIFIED
+    with pymupdf.open(stream=data) as doc:
+        doc[0].insert_text((56, 300), "Supplementary material", fontsize=12)
+        data = doc.tobytes()
+    result = verify(tmp_path, data)
+    assert result.state == RetrievalState.NEEDS_REVIEW and "SUPPLEMENT" in result.reasons
+
+
+def test_partial_title_is_insufficient_not_a_conflict(tmp_path):
+    result = verify(tmp_path, _page_one("Ocean wave energy conver-", "ter control", "https://doi.org/" + DOI))
+    assert result.state == RetrievalState.NEEDS_REVIEW and "TITLE_MISMATCH" in result.reasons
+    assert result.identity_match is None
 
 
 def test_version_claim_in_body_does_not_establish_copy_version(tmp_path):

@@ -33,7 +33,8 @@ def _public(address: str) -> bool:
         elif ip.sixtofour is not None or ip.teredo is not None:
             return False
     return ip.is_global and not (
-        ip.is_private
+        getattr(ip, "is_site_local", False)
+        or ip.is_private
         or ip.is_loopback
         or ip.is_link_local
         or ip.is_multicast

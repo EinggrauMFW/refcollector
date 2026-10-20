@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Callable, Sequence
+from typing import Any
 
 from refcollector.config import Limits
 from refcollector.contracts.ports import FileStore, FileVerifier, HttpClient, NetGuard, RetrievalOutcome
@@ -55,6 +56,22 @@ def _require_connection_policy(http: HttpClient) -> None:
 def _cancel(is_cancelled: Callable[[], bool]) -> None:
     if is_cancelled():
         raise Cancelled("Retrieval cancelled")
+
+
+async def _in_thread(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+    """Run blocking native parsing or hashing off the event loop; timeout and cancel stay live.
+
+    A thread cannot be killed: on timeout or cancel, wait for it to finish (bounded by the byte
+    and page limits) so no file handle outlives the call and the temp file can be removed.
+    """
+    task = asyncio.ensure_future(asyncio.to_thread(fn, *args, **kwargs))
+    try:
+        return await asyncio.shield(task)
+    except BaseException:
+        await asyncio.wait({task})
+        if not task.cancelled():
+            task.exception()  # mark retrieved
+        raise
 
 
 class DefaultRetriever:
@@ -123,7 +140,9 @@ class DefaultRetriever:
                     # A missing HTTP media type is not an assertion that this is PDF.
                     if result.content_type is None:
                         raise FileValidationFailed("Download has no Content-Type")
-                    verification = self._verifier.verify(tmp, metadata, content_type=result.content_type)
+                    verification = await _in_thread(
+                        self._verifier.verify, tmp, metadata, content_type=result.content_type
+                    )
                     _cancel(is_cancelled)
                     if time.monotonic() >= deadline:
                         raise TimeoutError("Verification exceeded retrieval deadline")
@@ -131,7 +150,7 @@ class DefaultRetriever:
                         raise FileValidationFailed(
                             "Downloaded file is not a readable PDF", details=verification.evidence
                         )
-                    blob = self._files.commit(tmp, "application/pdf")
+                    blob = await _in_thread(self._files.commit, tmp, "application/pdf")
                     self._files.grant(project_id, blob.sha256)
                     wf = WorkFile(
                         work_file_id=new_id("work_file"),

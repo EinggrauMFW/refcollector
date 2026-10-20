@@ -238,6 +238,24 @@ async def test_synchronous_verification_deadline_checked_before_commit(fake_stor
 
 
 @pytest.mark.anyio
+async def test_verification_runs_off_the_event_loop(fake_store):
+    import threading
+
+    seen = []
+
+    class Spy(DefaultFileVerifier):
+        def verify(self, *args, **kwargs):
+            seen.append(threading.get_ident())
+            return super().verify(*args, **kwargs)
+
+    result = await retriever(fake_store, verifier=Spy()).retrieve(
+        "prj_a", work(), [location()], http=FakeHttp(paper_pdf(TITLE, [], DOI)), is_cancelled=lambda: False
+    )
+    assert result.state == RetrievalState.VERIFIED
+    assert seen and seen[0] != threading.get_ident()
+
+
+@pytest.mark.anyio
 async def test_invalid_only_download_stores_nothing(fake_store):
     result = await retriever(fake_store).retrieve(
         "prj_a", work(), [location()], http=FakeHttp(b"<html>login</html>"), is_cancelled=lambda: False

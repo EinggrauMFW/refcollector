@@ -297,3 +297,26 @@ def test_copy_read_error_cannot_commit_even_a_parseable_prefix(fake_store, tmp_p
     )[-1]
     assert copy.state == LocalCopyState.UNUSABLE and copy.failed_check == LocalCopyCheck.READABLE
     assert not fake_store.files.blobs and list(fake_store.files.tmp.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "version,policy,cited,reason",
+    [
+        ("", VersionPolicy.ANY_ELIGIBLE, CopyVersion.PUBLISHED, "VERSION_UNKNOWN_OR_OUTSIDE_POLICY"),
+        (
+            "Preprint",
+            VersionPolicy.PREFER_PUBLISHED,
+            CopyVersion.UNKNOWN,
+            "VERSION_UNKNOWN_OR_OUTSIDE_POLICY",
+        ),
+        ("Preprint", VersionPolicy.CITED_VERSION_ONLY, CopyVersion.PUBLISHED, "VERSION_DIFFERENCE"),
+    ],
+)
+def test_version_difference_only_when_both_versions_known(
+    fake_store, tmp_path, version, policy, cited, reason
+):
+    copy = checker(fake_store, cited_version=lambda meta: cited).evaluate(
+        "prj_a", work(), version_policy=policy, attached_path=attached(tmp_path, version=version)
+    )[-1]
+    assert copy.failed_check == LocalCopyCheck.VERSION
+    assert copy.checks[LocalCopyCheck.VERSION].reason == reason

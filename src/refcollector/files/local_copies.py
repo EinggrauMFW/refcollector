@@ -223,7 +223,7 @@ class DefaultLocalCopyChecker:
             ),
             LocalCopyCheck.VERSION: _check(
                 _version_allowed(version, policy, cited),
-                "Version unknown or outside policy: VERSION_DIFFERENCE",
+                "VERSION_UNKNOWN_OR_OUTSIDE_POLICY",
             ),
         }
         if cited != CopyVersion.UNKNOWN and version not in (CopyVersion.UNKNOWN, cited):
