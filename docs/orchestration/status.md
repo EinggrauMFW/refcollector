@@ -10,9 +10,9 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 | 03 | extraction | A | wp/03 | 9256c3c8-3378-42e2-9840-8d7dc402b147 | merged | independently verified: 223 passed; integration 327 passed | gpt-6.1-sol completed; commit 82b5391; merged --no-ff into integration |
 | 04 | providers | A | wp/04 | 5ec5f7a2-d396-4140-8146-bfc3b5a952b4 | merged | 60 passed in worktree; integration 121 passed | Claude subagent (D-25); commit 26b46ad; merged --no-ff into integration |
 | 05 | outputs | A | wp/05 | 1a23156f-2cba-4e7c-a8ea-f5ba78dc72c0 | merged | independently verified: 225 passed; integration 327 passed | gpt-6.1-sol completed; commits 5c4c442 + c9a8ea1; merged --no-ff into integration |
-| 06 | identity | B | wp/06 | — | planned | not run | needs 04 |
-| 07 | access | B | wp/07 | — | planned | not run | needs 04 |
-| 08 | files | B | wp/08 | — | planned | not run | needs 01, 04 |
+| 06 | identity | B | wp/06 | c2cce524-10b9-495f-b206-e2e58ba2e054 | dispatched | pending | Codex gpt-6.1-sol; base aeb736a; briefs/wp-06.md |
+| 07 | access | B | wp/07 | 09a55586-2910-4752-8357-7ac15d93b5d8 | dispatched | pending | Codex gpt-6.1-sol; base aeb736a; briefs/wp-07.md |
+| 08 | files | B | wp/08 | 7404fcf8-4e0b-417a-a6a4-6d9cc670b465 | dispatched | pending | Codex gpt-6.1-sol; base aeb736a; briefs/wp-08.md; connection-boundary DNS safety requires proof or a change request |
 | 09 | services | C | wp/09 | — | planned | not run | needs 01 |
 | 10 | pipeline | C | wp/10 | — | planned | not run | needs 01–09 |
 | 11 | mcp | C | wp/11 | — | planned | not run | fake service |
@@ -51,3 +51,7 @@ Review gate unchanged: owned paths only, orchestrator reads the diff and runs `u
 ## Wave A completion - 2026-10-20
 
 Reviewed WP-03 and WP-05 production changes and requirement tests. No merge-blocking defect found in reviewed code. Verified owned-path boundaries. Independently ran the required check in both worker worktrees: 223 and 225 passed. Merged both branches into integration with --no-ff. Combined check: lint and formatting passed; 327 passed in 18.57s. No push. Wave B packages remain planned.
+
+## Wave B dispatch - 2026-10-20
+
+WP-06, WP-07 and WP-08 dispatched through Jean to Codex gpt-6.1-sol. Jean created worktrees from integration at aeb736a60ea507cdea855ba68ecaf1670b32eee3. All three branches were clean at that base before dispatch. Each worker received its committed brief, owned boundaries, check commands and completion rules. Jean returned started for all three. WP-09 remains planned in Wave C to keep max parallel workers at three. No implementation results verified yet.
