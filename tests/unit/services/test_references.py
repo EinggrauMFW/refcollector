@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """list/get/add/update references, review and approval staleness.
 
 AT-03, AT-12b, AT-13, AT-14, AT-18, AT-34, AT-39, AT-42, AT-43, W-06, W-07, W-11..W-19.
@@ -749,13 +750,13 @@ def test_edit_after_approval_makes_it_stale(env):  # AT-34, W-19
 def test_candidate_and_field_changes_make_approval_stale(env):
     pid, sid = setup(env)
     for change in (
-        lambda o, c, r: {
+        lambda o, c2, r: {
             "type": "set_fields",
             "occurrence_id": o.occurrence_id,
             "fields": {"title": "Fixed"},
             "expected_revision": r,
         },
-        lambda o, c, r: {
+        lambda o, c2, r: {
             "type": "reject_candidate",
             "occurrence_id": o.occurrence_id,
             "candidate_id": c2.candidate_id,
@@ -767,7 +768,7 @@ def test_candidate_and_field_changes_make_approval_stale(env):
         c2 = env.candidate(pid, occ.occurrence_id, doi="10.1/other", rank=2)
         user_accept(env, pid, occ, cand)
         cur = env.store.occurrences.get(pid, occ.occurrence_id)
-        upd(env, pid, change(occ, cand, cur.revision))
+        upd(env, pid, change(occ, c2, cur.revision))
         got = env.store.occurrences.get(pid, occ.occurrence_id)
         assert got.identity == IdentityState.NEEDS_REVIEW, change
 
