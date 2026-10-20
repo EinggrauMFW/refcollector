@@ -32,3 +32,4 @@ Smallest reasonable reading where the spec or the brief is ambiguous. Each entry
 | D-26 | Services and handlers must open mutating store transactions with `immediate=True` (WP-01 repos do this themselves only when no transaction is open). A deferred outer transaction that later writes can fail with SQLITE_BUSY. | Review of WP-01. | WP-09, WP-10 |
 | D-27 | Output reuse (6.6) is per project (WP-02 fix 3d095b1). Fingerprints still must include everything that changes the output. | Spec 7.1. | WP-02, WP-10 |
 | D-28 | Offline mode serves cache hits and denies misses with `NETWORK_MODE_DENIED`, zero sockets (spec 13 "cache only"). | Review of WP-04. | WP-04, WP-09 |
+| D-29 | Worker backend Codex, model gpt-6.1-sol for subsequent packages. Supersedes D-24/D-25 worker defaults; max three parallel workers remains. | User approved after incomplete Luna deliveries; Sol completed WP-03/05. | Wave B onward |
