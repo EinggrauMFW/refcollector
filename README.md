@@ -1,5 +1,8 @@
 # Refcollector
 
+> The v0.1 code lives in `legacy/` and runs as before from there. A rewrite to the P0 spec
+> (`docs/spec/refcollector-spec-v3.md`) is in progress in `src/refcollector/`.
+
 Give it a thesis or paper as a PDF. It finds the reference list, looks up full metadata for every
 entry, downloads the open-access PDFs it can find, and lists the paywalled ones with a drafted
 email you can send to the authors.
@@ -26,13 +29,13 @@ Requires Python 3.10+.
 ```bash
 git clone https://github.com/EinggrauMFW/refcollector.git
 cd refcollector
-pip install -r requirements.txt
+pip install -r legacy/requirements.txt
 ```
 
 ## Quick start: web app
 
 ```bash
-python webapp/app.py
+python legacy/webapp/app.py
 ```
 
 Open <http://127.0.0.1:8000>, enter your email in Settings, upload a PDF, press Start.
@@ -41,15 +44,15 @@ See the [user guide](docs/USER_GUIDE.md) for a walk-through.
 ## Quick start: command line
 
 ```bash
-python refcollector.py paper.pdf --email you@example.com --out output
-python refcollector.py paper.pdf --email you@example.com --no-download   # metadata only
+python legacy/refcollector.py paper.pdf --email you@example.com --out output
+python legacy/refcollector.py paper.pdf --email you@example.com --no-download   # metadata only
 ```
 
 ## Your email address
 
 Unpaywall, OpenAlex and Crossref ask API users to identify themselves with a real email address.
 Refcollector sends yours only to those services, as their documentation asks. It is stored locally
-in `webapp/data/config.json`, which is git-ignored. Placeholder addresses such as `@example.com` are
+in `legacy/webapp/data/config.json`, which is git-ignored. Placeholder addresses such as `@example.com` are
 rejected by Unpaywall.
 
 ## Optional: Semantic Scholar API key
@@ -60,9 +63,9 @@ slower. If you have a key, set the `S2_API_KEY` environment variable.
 ## Tests
 
 ```bash
-python tests/test_matching.py                      # offline checks of matching and exports
-python tests/batch_extract.py  <folder-of-pdfs>    # how many references are extracted per PDF
-python tests/batch_resolve.py  <folder-of-pdfs> you@example.com 60   # resolve, first 60 per PDF
+python legacy/tests/test_matching.py                      # offline checks of matching and exports
+python legacy/tests/batch_extract.py  <folder-of-pdfs>    # how many references are extracted per PDF
+python legacy/tests/batch_resolve.py  <folder-of-pdfs> you@example.com 60   # resolve, first 60 per PDF
 ```
 
 ## Limitations
@@ -78,9 +81,9 @@ python tests/batch_resolve.py  <folder-of-pdfs> you@example.com 60   # resolve, 
 ## Project layout
 
 ```
-refcollector.py        core: extraction, matching, resolvers, exporters (also the CLI)
-webapp/app.py          FastAPI server
-webapp/static/         the single-page UI
-tests/                 offline tests and batch scripts
-docs/USER_GUIDE.md     how to use the web app
+legacy/refcollector.py        core: extraction, matching, resolvers, exporters (also the CLI)
+legacy/webapp/app.py          FastAPI server
+legacy/webapp/static/         the single-page UI
+legacy/tests/                 offline tests and batch scripts
+docs/USER_GUIDE.md            how to use the web app
 ```

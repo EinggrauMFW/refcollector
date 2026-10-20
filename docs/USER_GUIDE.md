@@ -5,7 +5,7 @@
 ```bash
 cd refcollector
 pip install -r requirements.txt      # first time only
-python webapp/app.py
+python legacy/webapp/app.py
 ```
 
 Open <http://127.0.0.1:8000> in your browser. The app runs only on your own computer.
@@ -17,7 +17,7 @@ Stop it with `Ctrl+C` in the terminal.
 |---|---|
 | **Your email** (required) | Sent to Unpaywall, OpenAlex and Crossref so they can contact you if needed. Must be a real address. |
 | **Your name, affiliation, purpose** | Filled into the request emails for paywalled papers. Optional. |
-| **Library folder** | Where results are saved. Leave empty for `webapp/library/`. Applies to new jobs. |
+| **Library folder** | Where results are saved. Leave empty for `legacy/webapp/library/`. Applies to new jobs. |
 
 Press **Save**.
 
@@ -102,7 +102,7 @@ library/<Paper title>/
 ## 8. Command line
 
 ```bash
-python refcollector.py paper.pdf --email you@example.com --out output
+python legacy/refcollector.py paper.pdf --email you@example.com --out output
 ```
 
 Writes `references.bib`, `references.csl.json`, `references.json`, `unresolved.txt` and a `pdfs/` folder.
@@ -112,7 +112,7 @@ Add `--no-download` to skip PDFs.
 
 | Problem | Fix |
 |---|---|
-| "Could not find a References section heading" | The PDF uses a different heading (e.g. "Sources"). Add that word to `HEADING_RE` in `refcollector.py`. |
+| "Could not find a References section heading" | The PDF uses a different heading (e.g. "Sources"). Add that word to `HEADING_RE` in `legacy/refcollector.py`. |
 | Very few references found | Check the PDF's text is selectable (not a scan). Two-column layouts can interleave; try a single-column version. |
 | Entries look merged or cut off | Split heuristics missed the layout; fix DOIs by hand in the row, or report the PDF layout. |
 | No PDFs downloaded | Check your email in Settings is real (Unpaywall rejects placeholders). Many papers genuinely have no free copy. |

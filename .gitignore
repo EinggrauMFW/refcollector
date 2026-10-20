@@ -1,9 +1,10 @@
 # Papers and anything derived from them (copyright / privacy)
 *.pdf
-webapp/library/
-webapp/data/
+legacy/webapp/library/
+legacy/webapp/data/
 output/
 test_out*/
+legacy/tests/out/
 tests/out/
 tests/*.log
 *.log
