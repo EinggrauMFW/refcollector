@@ -7,9 +7,9 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 | C | Contracts freeze v1 | 1 | main | orchestrator | merged | check green: 20 passed | commit "contracts: freeze v1" |
 | 01 | storage | A | wp/01 | 252bef5f-1bb1-48b2-8a5f-d27c6ff83f27 | merged | 39 passed in worktree; integration 121 passed | Claude subagent (D-25); commit ca1094b; merged --no-ff into integration |
 | 02 | executor | A | wp/02 | 287686b7-6c0a-4566-ae61-8b16a259a6cf | merged | 62 passed in worktree; integration 121 passed | Claude subagent (D-25); commit 180a6d0 + fix 3d095b1; merged --no-ff into integration |
-| 03 | extraction | A | wp/03 | — | planned | not run | |
+| 03 | extraction | A | wp/03 | Codex (user-run) | planned | not run | brief ready: briefs/wp-03.md |
 | 04 | providers | A | wp/04 | 5ec5f7a2-d396-4140-8146-bfc3b5a952b4 | merged | 60 passed in worktree; integration 121 passed | Claude subagent (D-25); commit 26b46ad; merged --no-ff into integration |
-| 05 | outputs | A | wp/05 | — | planned | not run | |
+| 05 | outputs | A | wp/05 | Codex (user-run) | planned | not run | brief ready: briefs/wp-05.md |
 | 06 | identity | B | wp/06 | — | planned | not run | needs 04 |
 | 07 | access | B | wp/07 | — | planned | not run | needs 04 |
 | 08 | files | B | wp/08 | — | planned | not run | needs 01, 04 |
@@ -41,3 +41,9 @@ Antigravity runs cancelled (1-2 min per shell command). WP-01, WP-02, WP-04 buil
 Review gate: owned paths only; orchestrator ran `uv run python scripts/check.py` in each worktree (39, 61, 60 passed).
 WP-02 changes requested once: output reuse crossed projects; fixed in 3d095b1 with a regression test (62 passed).
 Merged into `integration` (--no-ff); full check on integration: 121 passed. Next: WP-03 extraction, WP-05 outputs.
+
+## Wave A, part 2 handoff - 2026-10-20
+
+The user runs WP-03 (extraction) and WP-05 (outputs) with Codex.
+Briefs: `briefs/wp-03.md`, `briefs/wp-05.md`. Branches `wp/03` and `wp/05` start from `integration` (this commit).
+Review gate unchanged: owned paths only, orchestrator reads the diff and runs `uv run python scripts/check.py`, then merges --no-ff into `integration`.
