@@ -1030,6 +1030,9 @@ def test_r03_job_clients_close_when_job_finishes_without_executor_shutdown(app, 
                 break
             await asyncio.sleep(0.001)
         assert app.executor.queue.get_job(pid, out.job_id).state == "completed"
+        # Queue completion can precede the end of tracked asynchronous client cleanup.
+        if app.executor._tasks:
+            await asyncio.gather(*tuple(app.executor._tasks))
         try:
             assert all(c._client.is_closed for c in offline.clients)
         finally:

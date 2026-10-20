@@ -15,8 +15,10 @@ from refcollector.executor.loop import Executor
 from refcollector.executor.queue import SqliteJobQueue
 from refcollector.extraction.builtin import BuiltinExtractionAdapter
 from refcollector.files.local_copies import DefaultLocalCopyChecker
+from refcollector.files.verify import DefaultFileVerifier
 from refcollector.pipeline.clients import ProviderFactory
 from refcollector.pipeline.files import SessionFileStore
+from refcollector.pipeline.native import NativeExtractor, NativeVerifier
 from refcollector.pipeline.registry import JobPlanner, handler_registry
 from refcollector.pipeline.state import input_key, view
 from refcollector.services.service import RefCollectorServiceImpl
@@ -130,7 +132,7 @@ def open_app(settings: Settings) -> AppHandle:
         files = SessionFileStore(db, settings)
         store.files = files
         queue = SqliteJobQueue(db)
-        extractor = BuiltinExtractionAdapter(settings.limits)
+        extractor = NativeExtractor(BuiltinExtractionAdapter(settings.limits))
         providers = ProviderFactory(db, settings.limits)
         service = RefCollectorServiceImpl(
             settings,
@@ -138,7 +140,12 @@ def open_app(settings: Settings) -> AppHandle:
             queue,
             extractor=extractor,
             identity_factory=providers.identity,
-            local_copies=DefaultLocalCopyChecker(store.files, store.work_files, limits=settings.limits),
+            local_copies=DefaultLocalCopyChecker(
+                store.files,
+                store.work_files,
+                limits=settings.limits,
+                verifier=NativeVerifier(DefaultFileVerifier(settings.limits)),
+            ),
         )
         executor = PipelineExecutor(
             settings,

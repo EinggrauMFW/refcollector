@@ -15,7 +15,9 @@ from refcollector.domain.enums import (
 from refcollector.errors import BudgetExceeded
 from refcollector.files.local_copies import DefaultLocalCopyChecker
 from refcollector.files.retrieval import DefaultRetriever
+from refcollector.files.verify import DefaultFileVerifier
 from refcollector.pipeline.files import StagedFiles
+from refcollector.pipeline.native import NativeVerifier
 from refcollector.pipeline.state import audit, blocking, capture, check_cancel, validate
 
 
@@ -25,7 +27,9 @@ class RetrieveHandler:
     def __init__(self, settings, providers):
         self.settings, self.providers = settings, providers
         self.pending = {}
-        self.retriever_factory = lambda files, limits: DefaultRetriever(files, limits=limits)
+        self.retriever_factory = lambda files, limits: DefaultRetriever(
+            files, limits=limits, verifier=NativeVerifier(DefaultFileVerifier(limits))
+        )
 
     async def run(self, ctx):
         staged = StagedFiles(ctx.store.files)
@@ -40,7 +44,12 @@ class RetrieveHandler:
         data = await blocking(capture, ctx)
         work = data["work"]
         check_cancel(ctx)
-        checker = DefaultLocalCopyChecker(staged, ctx.store.work_files, limits=self.settings.limits)
+        checker = DefaultLocalCopyChecker(
+            staged,
+            ctx.store.work_files,
+            limits=self.settings.limits,
+            verifier=NativeVerifier(DefaultFileVerifier(self.settings.limits)),
+        )
         copies = await blocking(
             checker.evaluate, ctx.job.project_id, work, version_policy=ctx.job.snapshot.version_policy
         )

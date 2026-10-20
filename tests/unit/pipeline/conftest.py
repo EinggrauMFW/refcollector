@@ -11,7 +11,6 @@ from refcollector.config import Settings
 from refcollector.contracts import api
 from refcollector.domain.enums import Channel, Scope, StepType
 from refcollector.files.netguard import DefaultNetGuard
-from refcollector.files.retrieval import DefaultRetriever
 from refcollector.providers.http import ProviderHttpClient
 from tests.fixtures.pdfs import paper_pdf
 
@@ -118,9 +117,14 @@ def app(tmp_path, monkeypatch, offline):
     async def resolve(host, port):
         return ["8.8.8.8"]
 
-    handler.retriever_factory = lambda files, limits: DefaultRetriever(
-        files, limits=limits, guard=DefaultNetGuard(resolve=resolve)
-    )
+    default_retriever = handler.retriever_factory
+
+    def retriever(files, limits):
+        instance = default_retriever(files, limits)
+        instance._guard = DefaultNetGuard(resolve=resolve)
+        return instance
+
+    handler.retriever_factory = retriever
     yield handle
     handle.close()
     assert all(c._client.is_closed for c in offline.clients)
