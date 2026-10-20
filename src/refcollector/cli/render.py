@@ -147,20 +147,30 @@ def ranked(cands: Sequence[CandidateView]) -> list[CandidateView]:
     return sorted(cands, key=lambda c: c.rank)
 
 
-def candidate_lines(cands: Sequence[CandidateView]) -> list[str]:
+def candidate_window(cands: Sequence[CandidateView], offset: int = 0) -> list[CandidateView]:
+    """The same live-candidate page is used for display and decision keys."""
+    return [c for c in ranked(cands) if not c.rejected][offset : offset + MAX_CANDIDATES_SHOWN]
+
+
+def candidate_lines(cands: Sequence[CandidateView], *, offset: int | None = None) -> list[str]:
     lines: list[str] = []
     shown = ranked(cands)
-    for i, c in enumerate(shown[:MAX_CANDIDATES_SHOWN], 1):
+    page = shown[:MAX_CANDIDATES_SHOWN] if offset is None else candidate_window(cands, offset)
+    for i, c in enumerate(page, 1):
         flag = " [rejected]" if c.rejected else ""
         lines.append(f"  {i}. {work_line(c.metadata)}{flag}")
         lines.append(f"     providers: {', '.join(c.providers)}")
         lines += [f"     - {r}" for r in c.reasons]
-    if len(shown) > MAX_CANDIDATES_SHOWN:
+    if offset is not None:
+        live_count = sum(not c.rejected for c in shown)
+        if live_count > MAX_CANDIDATES_SHOWN:
+            lines.append(f"  Candidates {offset + 1}-{offset + len(page)} of {live_count}; [p] next page")
+    elif len(shown) > MAX_CANDIDATES_SHOWN:
         lines.append(f"  (+{len(shown) - MAX_CANDIDATES_SHOWN} more)")
     return lines
 
 
-def reference(out: GetReferenceOut) -> str:
+def reference(out: GetReferenceOut, *, candidate_offset: int | None = None) -> str:
     o = out.occurrence
     reasons = ", ".join(o.identity.reasons)
     lines = [
@@ -173,7 +183,7 @@ def reference(out: GetReferenceOut) -> str:
     ]
     lines += [f"warning: {w}" for w in o.warnings]
     if out.candidates:
-        lines += ["", "Candidates:", *candidate_lines(out.candidates)]
+        lines += ["", "Candidates:", *candidate_lines(out.candidates, offset=candidate_offset)]
     for name in ("access", "local_copies", "files", "history"):
         items = getattr(out, name)
         if items:

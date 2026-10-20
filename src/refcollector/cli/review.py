@@ -42,8 +42,8 @@ from refcollector.errors import RcError, RevisionConflict
 from refcollector.ids import new_id
 
 PROMPT = (
-    "[a]ccept top  [1-5] choose  [r]eject  [d]oi  [e]dit  [s]plit  [m]erge next  "
-    "e[x]clude  [n]ew after  [u]nresolved  s[k]ip  [q]uit > "
+    "[a]ccept page top  [1-5] choose  [r]eject  [d]oi  [e]dit  [s]plit  [m]erge next  "
+    "e[x]clude  [n]ew after  [u]nresolved  s[k]ip  [p]age candidates  [q]uit > "
 )
 
 # ---------- terminal input (injectable) ----------
@@ -69,13 +69,10 @@ def read_key() -> str:
     if sys.platform == "win32":
         import msvcrt
 
-        def getch() -> str:
-            ch = msvcrt.getwch()
-            while msvcrt.kbhit():  # drop type-ahead and pasted text: one keypress, one decision
-                msvcrt.getwch()
-            return ch
-
-        return read_key_with(getch)
+        key = read_key_with(msvcrt.getwch)  # consume an extended-key suffix exactly once
+        while msvcrt.kbhit():  # drop type-ahead and pasted text: one keypress, one decision
+            msvcrt.getwch()
+        return key
 
     import termios
     import tty
@@ -84,9 +81,10 @@ def read_key() -> str:
     saved = termios.tcgetattr(fd)
 
     def posix_getch() -> str:
-        # os.read takes the whole pending burst, so escape sequences and pastes cannot
-        # leak extra keys into later decisions.
+        # Read the first burst, then flush the full input queue so escape sequences
+        # and long pastes cannot leak into later decisions or line-input prompts.
         data = os.read(fd, 32).decode("utf-8", errors="ignore")
+        termios.tcflush(fd, termios.TCIFLUSH)
         return "\x1b" if data.startswith("\x1b") else data[:1]
 
     try:
@@ -173,6 +171,7 @@ def _review_one(
     svc: RefCollectorService, project_id: str, queue: list[str], i: int, counts: Counter[str]
 ) -> str:
     ref: GetReferenceOut | None = None
+    candidate_offset = 0
     while True:
         if ref is None:
             ref = _get(svc, project_id, queue[i])
@@ -180,13 +179,22 @@ def _review_one(
                 counts["skipped"] += 1
                 return "next"
             echo()
-            echo(f"[{i + 1}/{len(queue)}] " + render.reference(ref))
+            echo(f"[{i + 1}/{len(queue)}] " + render.reference(ref, candidate_offset=candidate_offset))
         echo(PROMPT)
-        outcome = _handle(read_key(), svc, project_id, ref, queue, i, counts)
+        key = read_key()
+        if key == "p":
+            live_count = sum(not c.rejected for c in ref.candidates or [])
+            candidate_offset += render.MAX_CANDIDATES_SHOWN
+            if candidate_offset >= live_count:
+                candidate_offset = 0
+            ref = None
+            continue
+        outcome = _handle(key, svc, project_id, ref, queue, i, counts, candidate_offset)
         if outcome in ("next", "quit"):
             return outcome
         if outcome == "stay":
             ref = None
+            candidate_offset = 0
 
 
 def _handle(
@@ -197,12 +205,13 @@ def _handle(
     queue: list[str],
     i: int,
     counts: Counter[str],
+    candidate_offset: int = 0,
 ) -> str:
     """Return 'next', 'quit', 'stay' (reload and show again) or 'again' (just ask again)."""
     occ = ref.occurrence
     oid, rev = occ.occurrence_id, occ.revision
-    cands = render.ranked(ref.candidates or [])[: render.MAX_CANDIDATES_SHOWN]
-    live = [c for c in cands if not c.rejected]
+    cands = render.candidate_window(ref.candidates or [], candidate_offset)
+    live = cands
 
     def update(change: Change) -> None:
         svc.update_reference(
@@ -233,9 +242,10 @@ def _handle(
             if not live:
                 echo("No candidate to reject.")
                 return "again"
+            has_other_candidates = sum(not c.rejected for c in ref.candidates or []) > 1
             _decide(svc, project_id, oid, "reject", live[0].candidate_id, rev)
             counts["rejected"] += 1
-            return "stay" if len(live) > 1 else "next"
+            return "stay" if has_other_candidates else "next"
         if key == "d":
             doi = read_line("DOI: ").strip()
             if not doi:

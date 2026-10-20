@@ -215,3 +215,49 @@ def test_windows_key_reader() -> None:
     assert review.read_key_with(lambda: next(chars)) == "a"
     assert review.read_key_with(lambda: next(chars)) == "q"  # Ctrl-C quits
     assert review.read_key_with(lambda: next(chars)) == ""  # Enter: not a decision
+
+
+def test_accept_uses_first_live_candidate_after_rejections(tty: Cli) -> None:
+    ref = f.reference(n_candidates=6)
+    for candidate in ref.candidates[:5]:
+        candidate.rejected = True
+    tty.svc.responses["get_reference"] = ref
+    result = go(tty, "aq")
+    assert result.exit_code == 0, result.output
+    assert tty.calls("review_decision")[0][2].candidate_id == "cand_6"
+    assert "Title 6" in result.output
+
+
+def test_candidate_pages_use_displayed_numbers(tty: Cli) -> None:
+    tty.svc.responses["get_reference"] = f.reference(n_candidates=7)
+    result = go(tty, "p2q")
+    assert result.exit_code == 0, result.output
+    assert tty.calls("review_decision")[0][2].candidate_id == "cand_7"
+    assert "Title 6" in result.output and "Title 7" in result.output
+
+
+def test_candidate_pages_wrap_to_first_page(tty: Cli) -> None:
+    tty.svc.responses["get_reference"] = f.reference(n_candidates=7)
+    result = go(tty, "pp1q")
+    assert result.exit_code == 0, result.output
+    assert tty.calls("review_decision")[0][2].candidate_id == "cand_1"
+
+
+def test_reject_on_last_page_returns_to_remaining_candidates(tty: Cli) -> None:
+    ref = f.reference(n_candidates=6)
+    tty.svc.responses["get_reference"] = lambda ctx, req: (
+        ref if req.occurrence_id == "occ_1" else f.reference(req.occurrence_id)
+    )
+
+    def reject(ctx, req):  # noqa: ANN001, ANN202
+        ref.candidates[5].rejected = True
+        return f.updated()
+
+    tty.svc.responses["review_decision"] = reject
+    result = go(tty, "pr1q")
+    assert result.exit_code == 0, result.output
+    decisions = tty.calls("review_decision")
+    assert [(req.action, req.candidate_id, req.occurrence_id) for _, _, req in decisions] == [
+        ("reject", "cand_6", "occ_1"),
+        ("accept", "cand_1", "occ_1"),
+    ]
