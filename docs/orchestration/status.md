@@ -4,7 +4,7 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 
 | WP | Title | Wave | Branch | Session / log | State | Tests | Notes |
 |---|---|---|---|---|---|---|---|
-| C | Contracts freeze v1 | 1 | main | orchestrator | planned | not run | waits for "go" |
+| C | Contracts freeze v1 | 1 | main | orchestrator | merged | check green: 20 passed | commit "contracts: freeze v1" |
 | 01 | storage | A | wp/01 | — | planned | not run | |
 | 02 | executor | A | wp/02 | — | planned | not run | |
 | 03 | extraction | A | wp/03 | — | planned | not run | |
