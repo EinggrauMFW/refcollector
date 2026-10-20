@@ -14,7 +14,7 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 | 07 | access | B | wp/07 | 09a55586-2910-4752-8357-7ac15d93b5d8 | merged | 432 passed in worktree; integration 739 passed | 76073bb, d1e3a00; Sonnet review verdict MERGE |
 | 08 | files | B | wp/08 | 7404fcf8-4e0b-417a-a6a4-6d9cc670b465 | merged | 500 passed in worktree; integration 739 passed | bac12c3, d315d79 (DNS pinning), bd9034a (title match, off-loop verify, version reason, site-local) |
 | 09 | services | C | wp/09 | reviewed by Codex | merged | initial independent 823 passed; corrected 841 passed; integration 938 passed | 1af065f + a0130ca + 0228b85; approval staleness, transactional preconditions, UTF-8 paging fixes |
-| 10 | pipeline | C | wp/10 | — | planned | not run | needs 01–09 |
+| 10 | pipeline | C | wp/10 | 8bcfe954-ed5a-4657-96ff-c01fdd183a68 | dispatched | pending; base integration 938 passed | Claude Sonnet, effort high (D-32); base 6270605; briefs/wp-10.md |
 | 11 | mcp | C | wp/11 | reviewed by Codex | merged | independent 764 passed; integration 938 passed | d4502dc; no confirmed review defect |
 | 12 | cli | C | wp/12 | reviewed by Codex | merged | initial independent 803 passed; corrected 811 passed; integration 938 passed | b222f87 + 88fca3c; terminal input and live-candidate paging fixes |
 | D | integration + acceptance | D | integration | orchestrator | planned | not run | |
@@ -92,3 +92,7 @@ lint passed, 157 files formatted, 938 passed in 58.03s, check: all steps passed.
 Native terminal regression tests simulated the OS APIs; no real terminal session was tested.
 The earlier POSIX repeated-approval claim was not retained: setcbreak already flushes before the next key read.
 WP-10 brief is briefs/wp-10.md; dispatch follows from this verified source state. No push.
+
+## WP-10 dispatch - 2026-10-20
+
+Jean created wp/10 from clean integration base 6270605466d1a66648c982ad1955f1fabd802c29. Sent the committed pipeline/composition brief to session 8bcfe954-ed5a-4657-96ff-c01fdd183a68, backend claude, model sonnet, effort high per D-32. Jean returned started. All Wave C branches are merged; combined required check passed 938 tests. WP-10 implementation and final acceptance remain pending. No push.
