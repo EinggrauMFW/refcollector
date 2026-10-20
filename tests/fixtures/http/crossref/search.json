@@ -1,0 +1,28 @@
+{
+  "status": "ok",
+  "message-type": "work-list",
+  "message": {
+    "total-results": 2,
+    "items-per-page": 2,
+    "items": [
+      {
+        "DOI": "10.1000/abc.123",
+        "type": "journal-article",
+        "title": ["Deep Learning for Reference Parsing"],
+        "author": [{"given": "Ada", "family": "Lovelace"}],
+        "container-title": ["Journal of Examples"],
+        "issued": {"date-parts": [[2021]]},
+        "score": 88.1
+      },
+      {
+        "DOI": "10.1000/xyz.9",
+        "type": "proceedings-article",
+        "title": ["Parsing References at Scale"],
+        "author": [{"given": "Alan", "family": "Turing"}],
+        "issued": {"date-parts": [[null]]},
+        "published-online": {"date-parts": [[2019, 2]]},
+        "score": 40.2
+      }
+    ]
+  }
+}

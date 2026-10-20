@@ -1,0 +1,16 @@
+{
+  "ISBN:9780262033848": {
+    "url": "https://openlibrary.org/books/OL1M/Introduction_to_Algorithms",
+    "key": "/books/OL1M",
+    "title": "Introduction to Algorithms",
+    "subtitle": "Third Edition",
+    "authors": [
+      {"url": "https://openlibrary.org/authors/OL1A", "name": "Thomas H. Cormen"},
+      {"url": "https://openlibrary.org/authors/OL2A", "name": "Charles E. Leiserson"}
+    ],
+    "publishers": [{"name": "MIT Press"}],
+    "publish_date": "July 31, 2009",
+    "number_of_pages": 1292,
+    "identifiers": {"isbn_13": ["9780262033848"]}
+  }
+}

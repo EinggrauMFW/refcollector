@@ -1,0 +1,23 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message-version": "1.0.0",
+  "message": {
+    "DOI": "10.1000/ABC.123",
+    "URL": "https://doi.org/10.1000/abc.123",
+    "type": "journal-article",
+    "title": ["Deep Learning for Reference Parsing"],
+    "author": [
+      {"given": "Ada", "family": "Lovelace", "sequence": "first", "affiliation": []},
+      {"name": "World Health Organization", "sequence": "additional", "affiliation": []}
+    ],
+    "container-title": ["Journal of Examples"],
+    "volume": "12",
+    "issue": "3",
+    "page": "45-67",
+    "publisher": "Example Press",
+    "ISBN": [],
+    "issued": {"date-parts": [[2021, 5, 4]]},
+    "published-print": {"date-parts": [[2021, 6]]}
+  }
+}

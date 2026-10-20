@@ -1,0 +1,40 @@
+{
+  "doi": "10.1000/abc.123",
+  "doi_url": "https://doi.org/10.1000/abc.123",
+  "title": "Deep Learning for Reference Parsing",
+  "is_oa": true,
+  "best_oa_location": {
+    "url": "https://repo.example.org/record/1/files/paper.pdf",
+    "url_for_pdf": "https://repo.example.org/record/1/files/paper.pdf",
+    "url_for_landing_page": "https://repo.example.org/record/1",
+    "host_type": "repository",
+    "version": "acceptedVersion",
+    "license": "cc-by"
+  },
+  "oa_locations": [
+    {
+      "url": "https://repo.example.org/record/1/files/paper.pdf",
+      "url_for_pdf": "https://repo.example.org/record/1/files/paper.pdf",
+      "url_for_landing_page": "https://repo.example.org/record/1",
+      "host_type": "repository",
+      "version": "acceptedVersion",
+      "license": "cc-by"
+    },
+    {
+      "url": "https://journal.example.org/article/1",
+      "url_for_pdf": null,
+      "url_for_landing_page": "https://journal.example.org/article/1",
+      "host_type": "publisher",
+      "version": "publishedVersion",
+      "license": null
+    },
+    {
+      "url": "https://arxiv.org/abs/2101.00001",
+      "url_for_pdf": "https://arxiv.org/pdf/2101.00001",
+      "url_for_landing_page": "https://arxiv.org/abs/2101.00001",
+      "host_type": "repository",
+      "version": "submittedVersion",
+      "license": null
+    }
+  ]
+}
