@@ -201,6 +201,30 @@ class ResolveHandler:
                 accepted = fresh[result.accepted_index]
                 if accepted.rejected:
                     accepted = None
+            if accepted:
+                links = {
+                    key: normalize_doi(value) if key == "doi" else value
+                    for key in ("doi", "openalex_id")
+                    if (value := getattr(accepted.metadata, key))
+                }
+                matched = [
+                    work
+                    for key, value in links.items()
+                    if (work := store.works.find_by_link_key(occ.project_id, key, value))
+                ]
+                if len({work.work_id for work in matched}) > 1 or any(
+                    not same_keys(work.link_keys, links) for work in matched
+                ):
+                    # One matching identifier cannot override another conflicting identifier.
+                    accepted.reasons = list(
+                        dict.fromkeys([*accepted.reasons, ReasonCode.PROVIDER_DISAGREEMENT])
+                    )
+                    store.candidates.replace_for_occurrence(
+                        occ.project_id, occ.occurrence_id, [*fresh, *kept]
+                    )
+                    result.state = IdentityState.NEEDS_REVIEW
+                    result.reasons = list(dict.fromkeys([*result.reasons, ReasonCode.PROVIDER_DISAGREEMENT]))
+                    accepted = None
             if explicit and accepted:
                 previous = data["work"]
                 candidate_links = {
