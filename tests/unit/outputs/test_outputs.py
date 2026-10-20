@@ -1,6 +1,6 @@
-from types import SimpleNamespace
-
+from refcollector.contracts.ports import ExportRow
 from refcollector.domain.enums import ExtractionState, IdentityState, Selection
+from refcollector.domain.models import Occurrence
 from refcollector.outputs import (
     DefaultExporter,
     _key,
@@ -12,9 +12,19 @@ from refcollector.outputs import (
 
 
 def row(identity, extraction=ExtractionState.EXTRACTED, work=None, text="citation"):
-    return SimpleNamespace(
-        occurrence=SimpleNamespace(identity=identity, extraction=extraction, text=text),
+    return ExportRow(
+        occurrence=Occurrence(
+            occurrence_id="o",
+            project_id="p",
+            source_id="s",
+            order=0,
+            identity=identity,
+            extraction=extraction,
+            raw_text=text,
+        ),
         work=work,
+        decision=None,
+        access=None,
     )
 
 
