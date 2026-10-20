@@ -7,12 +7,12 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 | C | Contracts freeze v1 | 1 | main | orchestrator | merged | check green: 20 passed | commit "contracts: freeze v1" |
 | 01 | storage | A | wp/01 | 252bef5f-1bb1-48b2-8a5f-d27c6ff83f27 | merged | 39 passed in worktree; integration 121 passed | Claude subagent (D-25); commit ca1094b; merged --no-ff into integration |
 | 02 | executor | A | wp/02 | 287686b7-6c0a-4566-ae61-8b16a259a6cf | merged | 62 passed in worktree; integration 121 passed | Claude subagent (D-25); commit 180a6d0 + fix 3d095b1; merged --no-ff into integration |
-| 03 | extraction | A | wp/03 | 9256c3c8-3378-42e2-9840-8d7dc402b147 | merged | independently verified: 223 passed; integration 327 passed | gpt-6.1-sol completed; commit 82b5391; merged --no-ff into integration |
+| 03 | extraction | A | wp/03 | 9256c3c8-3378-42e2-9840-8d7dc402b147 | merged | 329 passed in worktree; integration 739 passed | 82b5391 + fix 2ffac17 (preflight warns instead of raising; Sonnet subagent) |
 | 04 | providers | A | wp/04 | 5ec5f7a2-d396-4140-8146-bfc3b5a952b4 | merged | 60 passed in worktree; integration 121 passed | Claude subagent (D-25); commit 26b46ad; merged --no-ff into integration |
 | 05 | outputs | A | wp/05 | 1a23156f-2cba-4e7c-a8ea-f5ba78dc72c0 | merged | independently verified: 225 passed; integration 327 passed | gpt-6.1-sol completed; commits 5c4c442 + c9a8ea1; merged --no-ff into integration |
-| 06 | identity | B | wp/06 | c2cce524-10b9-495f-b206-e2e58ba2e054 | changes_requested | worker reports 416 passed; independent review pending | 3f6e51a; follow-up running: field source ranks and persistence |
-| 07 | access | B | wp/07 | 09a55586-2910-4752-8357-7ac15d93b5d8 | changes_requested | worker reports 394 passed; independent review pending | 76073bb; follow-up running: explicit restriction evidence and scoped approval inputs |
-| 08 | files | B | wp/08 | 7404fcf8-4e0b-417a-a6a4-6d9cc670b465 | changes_requested | worker reports 455 passed; independent review pending | bac12c3; follow-up running: connection-boundary DNS safety; current default retrieval fails closed |
+| 06 | identity | B | wp/06 | c2cce524-10b9-495f-b206-e2e58ba2e054 | merged | 459 passed in worktree; integration 739 passed | 3f6e51a, 110d41b + fix 8cdbe0b (no invented DOIs; unresolved per 9.1 step 7, D-31) |
+| 07 | access | B | wp/07 | 09a55586-2910-4752-8357-7ac15d93b5d8 | merged | 432 passed in worktree; integration 739 passed | 76073bb, d1e3a00; Sonnet review verdict MERGE |
+| 08 | files | B | wp/08 | 7404fcf8-4e0b-417a-a6a4-6d9cc670b465 | merged | 500 passed in worktree; integration 739 passed | bac12c3, d315d79 (DNS pinning), bd9034a (title match, off-loop verify, version reason, site-local) |
 | 09 | services | C | wp/09 | — | planned | not run | needs 01 |
 | 10 | pipeline | C | wp/10 | — | planned | not run | needs 01–09 |
 | 11 | mcp | C | wp/11 | — | planned | not run | fake service |
@@ -59,3 +59,18 @@ WP-06, WP-07 and WP-08 dispatched through Jean to Codex gpt-6.1-sol. Jean create
 ## Wave B gap correction - 2026-10-20
 
 All three packages committed owned work but reported interface gaps. User authorized corrections. Sent bounded follow-ups with non-overlapping expanded ownership (D-30), compatibility and regression requirements, no push or merge. Jean returned started for all three on gpt-6.1-sol. Worker-reported passing tests do not resolve these gaps or constitute independent verification.
+
+## Wave B completion - 2026-10-20 (Claude orchestrator, Sonnet subagents)
+
+Codex quota ran out. Claude took over with Sonnet (effort high) subagents (D-32).
+WP-03 follow-up: preflight no longer raises REFERENCE_SECTION_NOT_FOUND; it returns a warning (2ffac17).
+WP-06: review found invented DOIs from spaced text and too few `unresolved`; fixed in 8cdbe0b (D-31).
+WP-07: review verdict MERGE.
+WP-08: cancelled Codex follow-up finished (d315d79); review found strict title match, on-loop parsing,
+wrong version reason and site-local IPv6; fixed in bd9034a.
+The orchestrator ran `uv run python scripts/check.py` in every worktree and after every merge.
+Integration b1fd48d: 739 passed.
+Known limits: `restricted` unreachable with P0 OA providers; OA locations not deduplicated by URL;
+managed reuse needs a detected version; strict `is_repaired` and octet-stream rejection;
+providers/files import cycle held by a lazy import.
+Next: Wave C (WP-09 services, WP-11 MCP, WP-12 CLI, then WP-10 pipeline).
