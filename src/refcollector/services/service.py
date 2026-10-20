@@ -92,6 +92,7 @@ from refcollector.errors import (
     NotFound,
     PathNotAllowed,
     PrerequisiteNotMet,
+    RevisionConflict,
     RevisionNotCurrent,
     UnsupportedSource,
 )
@@ -708,7 +709,7 @@ class RefCollectorServiceImpl:
                 "stages must be unique and in pipeline order: extract, resolve, discover_access"
             )
 
-        def prepare() -> tuple[int, list[str]]:
+        def validate() -> tuple[int, list[str]]:
             project = self.store.projects.get(req.project_id)
             scope = req.scope
             if Stage.EXTRACT in stages and not isinstance(scope, api.SourceScope):
@@ -748,8 +749,8 @@ class RefCollectorServiceImpl:
             link = list(scope.occurrence_ids) if isinstance(scope, api.OccurrenceScope) else []
             return planned, link
 
-        def fn(tx: Tx, prepared: tuple[int, list[str]]) -> api.StartJobOut:
-            planned, link = prepared
+        def fn(tx: Tx, _: Any) -> api.StartJobOut:
+            planned, link = validate()
             scope = req.scope
             scope_doc = (
                 {"source_ids": list(scope.source_ids)}
@@ -760,9 +761,7 @@ class RefCollectorServiceImpl:
             job = self._enqueue(tx, [StepType(s.value) for s in stages], scope_doc, options, link=link)
             return api.StartJobOut(job_id=job.job_id, steps_planned=planned, next_poll_after_ms=POLL_MS)
 
-        return self._mutate(
-            ctx, "start_job", req.project_id, req, api.StartJobOut, fn, prepare=prepare, bump=False
-        )
+        return self._mutate(ctx, "start_job", req.project_id, req, api.StartJobOut, fn, bump=False)
 
     def get_job(self, ctx: CallContext, req: api.GetJobIn) -> api.GetJobOut:
         project = self._read(ctx, Scope.PROJECTS_READ, req.project_id)
@@ -1080,11 +1079,22 @@ class RefCollectorServiceImpl:
             attached = next((r for r in rows if r.origin == LocalCopyOrigin.USER_ATTACHED), None)
             if attached is None:
                 raise InvalidState("the attachment was not evaluated")
-            return attached, any(r.state == LocalCopyState.USABLE for r in rows)
+            return attached, any(r.state == LocalCopyState.USABLE for r in rows), work, project.version_policy
 
         def fn(tx: Tx, prepared: Any) -> api.AttachFileOut:
-            attached, any_usable = prepared
+            attached, any_usable, checked_work, checked_policy = prepared
             occ = self.store.occurrences.get(req.project_id, req.occurrence_id)
+            if occ.identity not in ACCEPTED_IDENTITIES or not occ.work_id:
+                raise PrerequisiteNotMet("attach_file needs an accepted identity")
+            assert tx.project is not None
+            current_work = self.store.works.get(req.project_id, occ.work_id)
+            if (
+                occ.work_id != checked_work.work_id
+                or current_work.metadata != checked_work.metadata
+                or current_work.overrides != checked_work.overrides
+                or tx.project.version_policy != checked_policy
+            ):
+                raise RevisionConflict("attachment identity or version policy changed; evaluate again")
             copy = self.store.local_copies.add(
                 attached.model_copy(update={"occurrence_id": occ.occurrence_id})
             )
@@ -1109,7 +1119,7 @@ class RefCollectorServiceImpl:
     def download_files(self, ctx: CallContext, req: api.DownloadFilesIn) -> api.JobOut:
         self._need(ctx, Scope.FILES_DOWNLOAD)
 
-        def prepare() -> list[str]:
+        def validate() -> list[str]:
             project = self.store.projects.get(req.project_id)
             if not (project.download_enabled or self.settings.download_enabled_global):
                 raise NotAuthorized(
@@ -1138,7 +1148,8 @@ class RefCollectorServiceImpl:
                     )
             return [o.occurrence_id for o in occs]
 
-        def fn(tx: Tx, ids: list[str]) -> api.JobOut:
+        def fn(tx: Tx, _: Any) -> api.JobOut:
+            ids = validate()
             budget = req.budget.model_dump(exclude_none=True) if req.budget else {}
             options: dict[str, Any] = {"budget": budget}
             if req.version_policy:
@@ -1153,9 +1164,7 @@ class RefCollectorServiceImpl:
             )
             return api.JobOut(job_id=job.job_id)
 
-        return self._mutate(
-            ctx, "download_files", req.project_id, req, api.JobOut, fn, prepare=prepare, bump=False
-        )
+        return self._mutate(ctx, "download_files", req.project_id, req, api.JobOut, fn, bump=False)
 
     @staticmethod
     def _downloadable(o: Occurrence) -> bool:
@@ -1192,7 +1201,7 @@ class RefCollectorServiceImpl:
     def draft_requests(self, ctx: CallContext, req: api.DraftRequestsIn) -> api.JobOut:
         self._need(ctx, Scope.DRAFTS_CREATE)
 
-        def prepare() -> list[str]:
+        def validate() -> list[str]:
             occs = self.store.occurrences.get_many(req.project_id, req.scope.occurrence_ids)
             bad = [o.occurrence_id for o in occs if o.classification not in DRAFTABLE]
             if bad:
@@ -1202,7 +1211,8 @@ class RefCollectorServiceImpl:
                 )
             return [o.occurrence_id for o in occs]
 
-        def fn(tx: Tx, ids: list[str]) -> api.JobOut:
+        def fn(tx: Tx, _: Any) -> api.JobOut:
+            ids = validate()
             options = {
                 "sender": req.sender.model_dump(exclude_none=True),
                 "language": req.language.value,
@@ -1211,9 +1221,7 @@ class RefCollectorServiceImpl:
             job = self._enqueue(tx, [StepType.DRAFT], {"occurrence_ids": ids}, options, link=ids)
             return api.JobOut(job_id=job.job_id)
 
-        return self._mutate(
-            ctx, "draft_requests", req.project_id, req, api.JobOut, fn, prepare=prepare, bump=False
-        )
+        return self._mutate(ctx, "draft_requests", req.project_id, req, api.JobOut, fn, bump=False)
 
     def list_artifacts(self, ctx: CallContext, req: api.ListArtifactsIn) -> api.ListArtifactsOut:
         project = self._read(ctx, Scope.PROJECTS_READ, req.project_id)
@@ -1245,5 +1253,10 @@ class RefCollectorServiceImpl:
             decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
             out.text = decoder.decode(chunk, final=end >= size)
             consumed = len(chunk) - len(decoder.getstate()[0])
+            if chunk and consumed == 0:
+                raise InvalidInput(
+                    "length cannot hold one complete UTF-8 character",
+                    recovery_hint="Increase length to at least 4 bytes (within the server limit) and retry.",
+                )
             out.eof = req.offset + consumed >= size
         return self._meta(ctx, out, project.revision)
