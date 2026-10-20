@@ -28,6 +28,43 @@ SEARCH_ORDER = ("crossref", "openalex", "semanticscholar")
 SOURCE_RANKS = {"identifier_linked": 0, "corroborating": 1, "parsed": 2, "agent": 3}
 
 
+def _merge_metadata_fields(
+    work: ProjectWork | None, accepted: WorkMetadata, source_rank: int
+) -> tuple[WorkMetadata, dict[str, int]]:
+    """One pure field merge for both public methods. Lower ranks have precedence.
+
+    An unranked nonempty value has unknown origin. Only rank 0 may replace it;
+    keeping it does not invent provenance. Empty values may be filled at any rank.
+    Equal ranks allow refresh. Missing incoming values never clear existing data.
+    Locks override both data and ranks; locked fields retain their recorded ranks.
+    """
+    if type(source_rank) is not int or source_rank not in SOURCE_RANKS.values():
+        raise InvalidInput("source_rank must be 0 (identifier), 1 (provider), 2 (parsed), or 3 (agent).")
+    incoming = accepted.model_dump()
+    if work is None:
+        return accepted.model_copy(deep=True), {
+            field: source_rank for field, value in incoming.items() if value not in (None, "", [])
+        }
+    data = work.metadata.model_dump()
+    ranks = dict(work.metadata_source_ranks)
+    for field in WorkMetadata.model_fields:
+        if work.locks.get(field):
+            if field in work.overrides:
+                data[field] = deepcopy(work.overrides[field])
+            continue
+        if incoming[field] in (None, "", []):
+            continue
+        previous_rank = ranks.get(field)
+        if (
+            data[field] in (None, "", [])
+            or (previous_rank is not None and source_rank <= previous_rank)
+            or (previous_rank is None and source_rank == 0)
+        ):
+            data[field] = incoming[field]
+            ranks[field] = source_rank
+    return WorkMetadata.model_validate(data), ranks
+
+
 def _same_work(left: WorkMetadata, right: WorkMetadata) -> bool:
     """Strong identifiers first; never collapse distinct editions or DOI siblings by title."""
     for field in ("doi", "isbn", "arxiv", "pmid", "openalex_id"):
@@ -327,26 +364,26 @@ class DefaultIdentityResolver:
     def merge_metadata(
         self, work: ProjectWork | None, accepted: WorkMetadata, *, source_rank: int
     ) -> WorkMetadata:
-        """Pure merge. Locks include explicit None/empty override values.
+        """Pure compatibility method returning metadata only, with the same field policy.
 
-        Ranks: 0 identifier-linked, 1 corroborating, 2 parsed, 3 agent. The frozen
-        ProjectWork has no field provenance/ranks. Existing nonempty values therefore
-        conservatively act as identifier-linked data: rank 0 refreshes, lower ranks
-        fill gaps. The caller must resolve lower-priority provenance before this call.
-        No rank cache is kept: decisions and locks cannot cross project boundaries.
+        Ranks: 0 identifier-linked, 1 corroborating, 2 parsed, 3 agent. Use
+        merge_work_metadata when persisting updates so their ranks are saved too.
         """
-        if source_rank not in SOURCE_RANKS.values():
-            raise InvalidInput("source_rank must be 0 (identifier), 1 (provider), 2 (parsed), or 3 (agent).")
-        result = accepted.model_copy(deep=True) if work is None else work.metadata.model_copy(deep=True)
-        if work is None:
-            return result
-        data = result.model_dump()
-        incoming = accepted.model_dump()
-        for field in WorkMetadata.model_fields:
-            if work.locks.get(field):
-                if field in work.overrides:
-                    data[field] = deepcopy(work.overrides[field])
-            elif incoming[field] not in (None, "", []):
-                if source_rank == 0 or data[field] in (None, "", []):
-                    data[field] = incoming[field]
-        return WorkMetadata.model_validate(data)
+        metadata, _ = _merge_metadata_fields(work, accepted, source_rank)
+        return metadata
+
+    def merge_work_metadata(
+        self, work: ProjectWork, accepted: WorkMetadata, *, source_rank: int
+    ) -> ProjectWork:
+        """WP-10 integration: return a detached work with merged metadata and ranks.
+
+        Persist the returned ProjectWork with Store.works.update in the caller's
+        transaction. For a new work, construct an empty ProjectWork, then call this
+        method before Store.works.add. No persistence or input mutation occurs here.
+        IDs, locks, overrides, notes, link keys, and timestamps are copied unchanged.
+        """
+        metadata, ranks = _merge_metadata_fields(work, accepted, source_rank)
+        result = work.model_copy(deep=True)
+        result.metadata = metadata
+        result.metadata_source_ranks = ranks
+        return result

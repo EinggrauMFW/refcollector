@@ -251,6 +251,8 @@ class ProjectWork(Model):
     work_id: str
     project_id: str
     metadata: WorkMetadata
+    # 0 identifier-linked, 1 corroborating, 2 parsed, 3 agent; absent means unknown.
+    metadata_source_ranks: dict[str, int] = Field(default_factory=dict)
     overrides: dict[str, Any] = Field(default_factory=dict)  # set_fields values
     locks: dict[str, bool] = Field(default_factory=dict)
     notes: list[str] = Field(default_factory=list)
