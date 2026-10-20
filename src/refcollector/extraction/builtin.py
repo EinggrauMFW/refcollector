@@ -117,7 +117,10 @@ class BuiltinExtractionAdapter:
 
     def preflight(self, data: bytes | str, kind: SourceType) -> Preflight:
         source = self._read(data, kind)
-        result = self._result(source, None)
+        try:
+            result = self._result(source, None)
+        except ReferenceSectionNotFound:
+            result = ExtractionResult([], [], ["REFERENCE_SECTION_NOT_FOUND"])
         pages = len(source) if isinstance(source, list) else 0
         coverage = sum(page.has_text for page in source) / pages if pages else 0.0
         return Preflight(

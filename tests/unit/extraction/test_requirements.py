@@ -213,13 +213,14 @@ def test_w08_inferred_run_excludes_body_and_has_entries():
     assert [e.text for e in result.entries] == SAMPLE_REFS
 
 
-@pytest.mark.parametrize("method", ["preflight", "extract"])
-def test_no_reference_like_body_raises_typed_error(method):
+def test_no_reference_like_body_extract_raises_and_preflight_warns():
     with pymupdf.open() as doc:
         _body_page(doc, "1 Chapter One")
         data = doc.tobytes()
     with pytest.raises(ReferenceSectionNotFound):
-        getattr(BuiltinExtractionAdapter(), method)(data, SourceType.PDF)
+        BuiltinExtractionAdapter().extract(data, SourceType.PDF)
+    preflight = BuiltinExtractionAdapter().preflight(data, SourceType.PDF)
+    assert preflight.sections == [] and "REFERENCE_SECTION_NOT_FOUND" in preflight.warnings
 
 
 @pytest.mark.parametrize("method", ["preflight", "extract"])
@@ -559,3 +560,29 @@ def test_invalid_manual_offsets_raise_domain_error(start, end):
     )
     with pytest.raises(InvalidInput):
         BuiltinExtractionAdapter().extract(thesis_pdf(), SourceType.PDF, [section])
+
+
+def body_only_pdf(pages: int = 3) -> bytes:
+    with pymupdf.open() as doc:
+        for _ in range(pages):
+            _body_page(doc)
+        return doc.tobytes()
+
+
+def test_body_only_pdf_preflight_warns_instead_of_raising():
+    preflight = BuiltinExtractionAdapter().preflight(body_only_pdf(), SourceType.PDF)
+    assert preflight.pages == 3
+    assert preflight.text_coverage == 1.0
+    assert preflight.sections == [] and preflight.estimated_entries == 0
+    assert "REFERENCE_SECTION_NOT_FOUND" in preflight.warnings
+
+
+def test_body_only_pdf_extract_without_sections_raises():
+    with pytest.raises(ReferenceSectionNotFound):
+        BuiltinExtractionAdapter().extract(body_only_pdf(), SourceType.PDF)
+
+
+def test_body_only_pdf_extract_with_manual_section_does_not_raise():
+    section = SectionInfo(section_id="sec_manual", page_start=2, page_end=2)
+    result = BuiltinExtractionAdapter().extract(body_only_pdf(), SourceType.PDF, [section])
+    assert [s.manual for s in result.sections] == [True]
