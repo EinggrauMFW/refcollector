@@ -16,8 +16,8 @@ from refcollector.contracts.api import (
 from refcollector.domain.enums import AuditEventType, Scope, SourceType
 from refcollector.errors import (
     EncryptedDocument,
-    LimitExceeded,
     InvalidInput,
+    LimitExceeded,
     NotAuthorized,
     NotFound,
     PathNotAllowed,
