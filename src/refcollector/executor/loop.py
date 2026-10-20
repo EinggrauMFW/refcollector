@@ -292,10 +292,11 @@ class Executor:
         return claimed
 
     def _reuse(self, step: Step) -> bool:
+        """6.6 output reuse, per project only: project-scoped outputs are never shared (7.1)."""
         row = self.db.query_one(
-            "SELECT output_ref FROM step WHERE step_type = ? AND input_fingerprint = ? AND snapshot_hash = ?"
-            " AND state = 'succeeded' AND id != ? LIMIT 1",
-            (step.step_type.value, step.input_fingerprint, step.snapshot_hash, step.step_id),
+            "SELECT output_ref FROM step WHERE project_id = ? AND step_type = ? AND input_fingerprint = ?"
+            " AND snapshot_hash = ? AND state = 'succeeded' AND id != ? LIMIT 1",
+            (step.project_id, step.step_type.value, step.input_fingerprint, step.snapshot_hash, step.step_id),
         )
         if row is None:
             return False

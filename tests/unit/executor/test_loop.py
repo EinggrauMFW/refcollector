@@ -340,6 +340,23 @@ async def test_output_reused(fast, db, queue, project) -> None:  # type: ignore[
     ex.stop()
 
 
+async def test_output_not_reused_across_projects(fast, db, queue, project) -> None:  # type: ignore[no-untyped-def]
+    """Spec 7.1: project-scoped outputs are never shared between projects."""
+    other = add_project(db)
+    hr = ScriptedHandler(R)
+    j1 = queue.create_job(new_job(fast, project, {"resolve": ["o1"]}))
+    ex = make_executor(fast, db, [hr])
+    await ex.run_until_idle()  # project A's step succeeds first
+    j2 = queue.create_job(new_job(fast, other, {"resolve": ["o1"]}))
+    assert j1.snapshot_hash == j2.snapshot_hash
+    await ex.run_until_idle()
+    assert hr.calls["o1"] == 2
+    step = queue.steps(j2.job_id)[0]
+    assert step.state is StepState.SUCCEEDED
+    assert step.skip_reason is None
+    ex.stop()
+
+
 async def test_commit_runs_in_step_transaction(fast, db, queue, project) -> None:  # type: ignore[no-untyped-def]
     """A failing commit rolls back its own writes and the `succeeded` update together (6.4)."""
 
