@@ -6,8 +6,8 @@ from datetime import datetime
 from refcollector.access.classify import classify_access
 from refcollector.access.eligibility import P0_OA_PROVIDERS, is_eligible
 from refcollector.config import ELIGIBILITY_POLICY_VERSION
-from refcollector.contracts.ports import OAProvider
-from refcollector.domain.enums import DiscoveryState, VersionPolicy
+from refcollector.contracts.ports import ApprovedLocation, OALocationResult, OAProvider
+from refcollector.domain.enums import DiscoveryState, LocationBasis, VersionPolicy
 from refcollector.domain.models import AccessCheck, AccessLocation, ProjectWork, SourceFailure
 from refcollector.errors import ErrorCode, InvalidInput, RcError
 from refcollector.ids import PREFIXES, ulid
@@ -17,11 +17,12 @@ class DefaultAccessDiscoverer:
     """Discover through injected P0 OA providers; no network or storage of its own.
 
     Inject only configured adapters, or pass `enabled_providers` to restrict a
-    shared adapter list. No sources or no supported DOI means failed/unknown:
-    no source answered, so there is no evidence for a negative access result.
+    shared adapter list. No sources or no supported DOI means failed discovery:
+    no source answered. A trusted approved copy can still establish eligibility.
 
-    The frozen OAProvider returns only locations: it cannot report explicit
-    restrictions or work approvals. Do not infer either from an empty answer.
+    Detailed providers can supply explicit restriction evidence. Legacy list
+    providers remain supported. Trusted approval inputs must match the project
+    and work; provider-supplied approval flags are never trusted.
     Version policy affects later retrieval choices via select_versions, never
     access classification or the locations kept in an AccessCheck.
     """
@@ -42,7 +43,13 @@ class DefaultAccessDiscoverer:
         self._enabled = frozenset(names)
 
     async def discover(
-        self, project_id: str, work: ProjectWork, *, version_policy: VersionPolicy, now: datetime
+        self,
+        project_id: str,
+        work: ProjectWork,
+        *,
+        version_policy: VersionPolicy,
+        now: datetime,
+        approved_locations: Sequence[ApprovedLocation] = (),
     ) -> AccessCheck:
         if project_id != work.project_id:
             raise InvalidInput("The work belongs to another project")
@@ -50,13 +57,36 @@ class DefaultAccessDiscoverer:
         sources: list[str] = []
         failures: list[SourceFailure] = []
         locations: list[AccessLocation] = []
+        restriction_evidence: list[str] = []
         seen: set[str] = set()
         answered = 0
+        for approval in approved_locations:
+            if not isinstance(approval, ApprovedLocation) or (
+                approval.project_id != project_id or approval.work_id != work.work_id
+            ):
+                raise InvalidInput("Approved locations must match this project and work")
+            location = approval.location.model_copy(deep=True)
+            location.basis = LocationBasis.USER_APPROVED
+            location.eligible = is_eligible(
+                location,
+                work_id=work.work_id,
+                enabled_providers=self._enabled,
+                approved_work_id=approval.work_id,
+            )
+            key = location.model_dump_json()
+            if key not in seen:
+                locations.append(location)
+                seen.add(key)
         if isinstance(doi, str) and doi.strip():
             for provider in self._providers:
                 sources.append(provider.name)
                 try:
-                    found = await provider.locations(doi)
+                    detailed = getattr(provider, "locations_detailed", None)
+                    response = (
+                        await detailed(doi)
+                        if callable(detailed)
+                        else OALocationResult(locations=await provider.locations(doi))
+                    )
                 except Exception as exc:
                     # asyncio cancellation and process-control signals inherit
                     # BaseException. RcError cancellation must also propagate.
@@ -65,7 +95,12 @@ class DefaultAccessDiscoverer:
                     failures.append(SourceFailure(source=provider.name, error=str(exc)))
                     continue
                 answered += 1  # [] is an answer, not an outage.
-                for original in found:
+                restriction_evidence.extend(
+                    f"{provider.name}: {evidence}"
+                    for evidence in response.restriction_evidence
+                    if evidence.strip()
+                )
+                for original in response.locations:
                     location = original.model_copy(deep=True)
                     location.eligible = is_eligible(
                         location,
@@ -96,6 +131,7 @@ class DefaultAccessDiscoverer:
             sources_failed=failures,
             eligibility_policy_version=ELIGIBILITY_POLICY_VERSION,
             discovery=discovery,
-            classification=classify_access(discovery, locations),
+            classification=classify_access(discovery, locations, restriction_evidence),
             locations=locations,
+            restriction_evidence=restriction_evidence,
         )

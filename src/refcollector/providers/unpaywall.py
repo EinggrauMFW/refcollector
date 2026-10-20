@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from refcollector.config import Limits
-from refcollector.contracts.ports import HttpClient
+from refcollector.contracts.ports import HttpClient, OALocationResult
 from refcollector.domain.models import AccessLocation
 from refcollector.errors import ConfigMissingEmail
 from refcollector.providers import doi_path, oa_json, oa_location, text
@@ -18,6 +18,16 @@ class UnpaywallProvider:
         self._ttl = (limits or Limits()).cache_ttl_search_s
 
     async def locations(self, doi: str) -> list[AccessLocation]:
+        return (await self.locations_detailed(doi)).locations
+
+    async def locations_detailed(self, doi: str) -> OALocationResult:
+        """Keep the v2 location mapping; no documented explicit denial field.
+
+        oa_status=closed and is_oa=false describe a lack of known OA copies,
+        not an explicit restriction. Do not turn them into restriction evidence.
+        See https://unpaywall.org/data-format and
+        https://help.openalex.org/data/works/open-access/ .
+        """
         if not self._email:
             raise ConfigMissingEmail("Unpaywall needs a contact email")
         data = await oa_json(
@@ -45,4 +55,4 @@ class UnpaywallProvider:
                     licence=text(loc.get("license")),
                 )
             )
-        return out
+        return OALocationResult(locations=out)

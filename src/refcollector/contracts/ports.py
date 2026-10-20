@@ -485,13 +485,38 @@ class MetadataProvider(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class OALocationResult:
+    """One source's work-specific locations and explicit restriction statements.
+
+    Evidence is interpreted by the adapter from documented response fields.
+    HTTP errors, absence of an OA result, licences and URL reachability are
+    not restriction evidence. Discovery adds the consulted source name.
+    """
+
+    locations: list[AccessLocation] = field(default_factory=list)
+    restriction_evidence: list[str] = field(default_factory=list)
+
+
 class OAProvider(Protocol):
-    """Unpaywall, OpenAlex locations (10.1)."""
+    """Unpaywall, OpenAlex locations (10.1).
+
+    Legacy list-returning adapters remain supported. Adapters can additionally
+    implement DetailedOAProvider; discovery then uses its single detailed call.
+    """
 
     name: str
 
     async def locations(self, doi: str) -> list[AccessLocation]:
         """Raises errors.ProviderUnavailable when the provider did not answer."""
+        ...
+
+
+class DetailedOAProvider(OAProvider, Protocol):
+    """Optional additive capability; the legacy locations method is unchanged."""
+
+    async def locations_detailed(self, doi: str) -> OALocationResult:
+        """Same failure contract as locations; never infer restriction from failure."""
         ...
 
 
@@ -549,12 +574,39 @@ class IdentityResolver(Protocol):
 # =====================================================================================
 
 
+@dataclass(frozen=True)
+class ApprovedLocation:
+    """Trusted internal input after approval verification for one project/work.
+
+    This scope is checked by discovery, but is not itself proof of approval.
+    Only a caller that verified the approval may construct this input. Never
+    construct it from a tool argument, a provider claim or a location ID match.
+    """
+
+    project_id: str
+    work_id: str
+    location: AccessLocation
+
+
 class AccessDiscoverer(Protocol):
     async def discover(
-        self, project_id: str, work: ProjectWork, *, version_policy: VersionPolicy, now: datetime
+        self,
+        project_id: str,
+        work: ProjectWork,
+        *,
+        version_policy: VersionPolicy,
+        now: datetime,
+        approved_locations: Sequence[ApprovedLocation] = (),
     ) -> AccessCheck:
         """One discovery run (10.1, 7.5). Never raises for provider failures; they go to
-        `sources_failed`. The result is not stored; the caller stores it as current."""
+        `sources_failed`. The result is not stored; the caller stores it as current.
+
+        approved_locations is a trusted internal input, never a public tool
+        flag. The caller must verify approval for this project and work first.
+        Discovery rejects mismatched scope and marks these copies user_approved
+        without changing their provider provenance, identity, version or licence.
+        Approval does not bypass network, retrieval or file safety controls.
+        """
         ...
 
 

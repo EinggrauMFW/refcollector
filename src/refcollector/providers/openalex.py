@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from refcollector.config import Limits
-from refcollector.contracts.ports import CitationQuery, HttpClient
+from refcollector.contracts.ports import CitationQuery, HttpClient, OALocationResult
 from refcollector.domain.models import AccessLocation, ProviderRecord, WorkMetadata
 from refcollector.providers import (
     doi_path,
@@ -56,11 +56,20 @@ class OpenAlexProvider:
         return [r for w in (data or {}).get("results") or [] if (r := self._record(w))]
 
     async def locations(self, doi: str) -> list[AccessLocation]:
+        return (await self.locations_detailed(doi)).locations
+
+    async def locations_detailed(self, doi: str) -> OALocationResult:
+        """Keep the OA locations; missing OA is not an explicit restriction.
+
+        The documented closed status is a catch-all, not an access denial.
+        No documented field supplies explicit restriction statements:
+        https://help.openalex.org/data/works/open-access/ .
+        """
         work = await oa_json(
             self._http, f"{BASE}/doi:{doi_path(doi)}", self.name, cache_ttl_s=self._search_ttl
         )
         if not isinstance(work, dict):
-            return []
+            return OALocationResult()
         listed = work.get("locations") or [work.get("best_oa_location") or {}]
         out: list[AccessLocation] = []
         seen: set[str] = set()
@@ -80,7 +89,7 @@ class OpenAlexProvider:
                     licence=text(loc.get("license")),
                 )
             )
-        return out
+        return OALocationResult(locations=out)
 
     def _record(self, w: dict[str, Any]) -> ProviderRecord | None:
         title = text(w.get("title")) or text(w.get("display_name"))
