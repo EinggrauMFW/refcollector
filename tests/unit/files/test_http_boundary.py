@@ -1,4 +1,7 @@
-"""Real merged HTTP client over socket-free transports: limits, redirects and gap proof."""
+"""Real HTTP client over explicit socket-free fixtures: limits and redirects.
+
+Actual pinning is tested below HTTPX/httpcore in providers/test_retrieval_transport.py.
+"""
 
 import asyncio
 
@@ -34,7 +37,11 @@ class Stream(httpx.AsyncByteStream):
 
 def client(db, handler):
     return ProviderHttpClient(
-        snapshot(NetworkMode.RETRIEVAL), db, Limits(), transport=httpx.MockTransport(handler), secrets={}
+        snapshot(NetworkMode.RETRIEVAL),
+        db,
+        Limits(),
+        download_transport=httpx.MockTransport(handler),
+        secrets={},
     )
 
 
@@ -127,11 +134,11 @@ async def test_real_download_stream_limits_cleanup(db, tmp_path, mode):
 
 
 @pytest.mark.anyio
-async def test_frozen_http_accepts_private_peer_after_public_preflight_blocker(db, tmp_path):
-    """Characterization of missing boundary hook, NOT a rebinding protection pass.
+async def test_explicit_mock_fixture_does_not_depend_on_peer_inspection(db, tmp_path):
+    """Explicit socket-free fixtures do not use peer inspection as a safety policy.
 
     MockTransport reports a private connection after DNS preflight approved public DNS.
-    No sockets open. Current HTTP client neither pins addresses nor validates the peer.
+    No sockets open. Real transport protection is proved in the provider backend tests.
     """
 
     class PrivatePeer:
@@ -169,12 +176,7 @@ async def test_retriever_actual_http_redirect_verified_and_limits(db, fake_store
 
     http = client(db, handler)
 
-    def offline_only(value):
-        assert value is http  # This exact client uses only the above MockTransport.
-
-    retriever = DefaultRetriever(
-        fake_store.files, guard=DefaultNetGuard(resolve=resolver("8.8.8.8")), connection_policy=offline_only
-    )
+    retriever = DefaultRetriever(fake_store.files, guard=DefaultNetGuard(resolve=resolver("8.8.8.8")))
     try:
         result = await retriever.retrieve(
             "prj_a", work(), [location()], http=http, is_cancelled=lambda: False

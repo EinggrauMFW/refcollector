@@ -24,15 +24,19 @@ from refcollector.contracts.ports import DownloadResult, HttpResponse, NetGuard,
 from refcollector.domain.models import ConfigSnapshot
 from refcollector.errors import (
     Cancelled,
+    IntegrationUnavailable,
     LimitExceeded,
     NetworkModeDenied,
     ProviderUnavailable,
     RateLimited,
     TransientNetworkError,
 )
+from refcollector.files.netguard import validate_destination
 from refcollector.providers import cache
 from refcollector.providers.limiter import HostLimiters
 from refcollector.storage.db import Database
+
+from .retrieval_transport import PinnedDownloadTransport
 
 MAX_429_ATTEMPTS = 3
 
@@ -78,9 +82,13 @@ class ProviderHttpClient:
         limits: Limits,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
+        download_transport: httpx.MockTransport | None = None,
         sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
         secrets: Mapping[str, str] | None = None,
     ) -> None:
+        if download_transport is not None and type(download_transport) is not httpx.MockTransport:
+            raise IntegrationUnavailable("Download test transport must be an explicit httpx.MockTransport")
+        self._download_transport = download_transport
         self._mode = snapshot.network_mode
         self._db = db
         self._limits = limits
@@ -91,6 +99,7 @@ class ProviderHttpClient:
         ua = f"refcollector/{refcollector.__version__}"
         if snapshot.contact_email:
             ua += f" (mailto:{snapshot.contact_email})"
+        self._user_agent = ua
         self._client = httpx.AsyncClient(
             transport=transport, headers={"User-Agent": ua}, timeout=30.0, follow_redirects=True
         )
@@ -175,9 +184,19 @@ class ProviderHttpClient:
             raise NetworkModeDenied(f"network mode {self._mode.value}: downloads need retrieval")
         try:
             async with asyncio.timeout(timeout_s):
-                return await self._download(
-                    url, dest, max_bytes, timeout_s, max_redirects, guard, is_cancelled
+                # Metadata connections, cookies and proxy routes are never reused for retrieval.
+                transport = self._download_transport or PinnedDownloadTransport(
+                    guard, is_cancelled=is_cancelled
                 )
+                async with httpx.AsyncClient(
+                    transport=transport,
+                    trust_env=False,
+                    headers={"User-Agent": self._user_agent},
+                    follow_redirects=False,
+                ) as client:
+                    return await self._download(
+                        url, dest, max_bytes, timeout_s, max_redirects, guard, is_cancelled, client
+                    )
         except BaseException as exc:
             # AT-10a: no partial file survives. Sync on purpose: it must run even mid-cancellation.
             dest.unlink(missing_ok=True)  # noqa: ASYNC240
@@ -194,11 +213,18 @@ class ProviderHttpClient:
         max_redirects: int,
         guard: NetGuard,
         is_cancelled: Callable[[], bool] | None,
+        client: httpx.AsyncClient,
     ) -> DownloadResult:
         current = url
         for _ in range(max_redirects + 1):
-            await guard.check(current)
-            async with self._client.stream("GET", current, follow_redirects=False, timeout=timeout_s) as r:
+            if is_cancelled is not None and is_cancelled():
+                raise Cancelled("download cancelled")
+            validate_destination(current)
+            if self._download_transport is not None:
+                # Explicit socket-free fixtures retain URL checks. Real transports resolve
+                # once inside PinnedDownloadTransport and connect only to checked IPs.
+                await guard.check(current)
+            async with client.stream("GET", current, follow_redirects=False, timeout=timeout_s) as r:
                 if r.is_redirect:
                     current = str(r.url.join(r.headers["location"]))
                     continue

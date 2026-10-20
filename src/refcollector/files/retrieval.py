@@ -2,11 +2,10 @@
 
 Retrieval orchestration over frozen HTTP and storage ports.
 
-The current HTTP port has no connection-boundary policy hook. Default retrieval
-therefore fails closed. A trusted composition root may supply connection_policy
-only for an HttpClient whose transport it has secured (or a socket-free fake).
-The callback must reject every other client; a second DNS lookup is insufficient.
-No transport internals are accessed or patched here.
+Default retrieval accepts the concrete ProviderHttpClient, whose download path pins
+checked addresses. Unknown clients and subclasses that can override download fail
+closed. A trusted composition root can still authorize another implementation with
+an explicit connection_policy; test fixtures authorize their socket-free fake only.
 """
 
 from __future__ import annotations
@@ -42,10 +41,14 @@ def effective_metadata(work: ProjectWork) -> WorkMetadata:
 
 
 def _require_connection_policy(http: HttpClient) -> None:
+    # Local import avoids a cycle: the provider transport uses the file URL validator.
+    from refcollector.providers.http import ProviderHttpClient
+
+    if type(http) is ProviderHttpClient:
+        return
     raise IntegrationUnavailable(
-        "Retrieval is disabled: HttpClient has no verified connection-boundary DNS protection",
-        recovery_hint="The HTTP owner must implement checked-address pinning with TLS validation; "
-        "then configure a trusted connection_policy for that client.",
+        "Retrieval client has no known connection-boundary DNS protection",
+        recovery_hint="Use the default ProviderHttpClient or explicitly authorize a secured implementation.",
     )
 
 

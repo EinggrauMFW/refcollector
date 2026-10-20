@@ -1,10 +1,7 @@
 """WP-08: NetGuard implementation. Spec 13, 10.4 step 1.
 
-Destination preflight policy. This is NOT connection-boundary rebinding protection.
-
-The frozen NetGuard.check() cannot select or validate the socket opened by HttpClient.
-The HTTP owner must enforce this policy again at connection time, preserving TLS SNI
-and certificate validation and preventing proxy/pool bypasses. See WP-08's report.
+Shared destination validation and checked resolution. check() alone is a preflight;
+the download transport consumes resolve_addresses() and pins its TCP destination.
 """
 
 from __future__ import annotations
@@ -27,6 +24,8 @@ async def _resolve(host: str, port: int) -> Sequence[str]:
 
 
 def _public(address: str) -> bool:
+    if "%" in address:
+        return False
     ip = ipaddress.ip_address(address)
     if isinstance(ip, ipaddress.IPv6Address):
         if ip.ipv4_mapped is not None:
@@ -43,6 +42,39 @@ def _public(address: str) -> bool:
     )
 
 
+def validate_destination(url: str) -> tuple[str, int, bool]:
+    """Validate the original URL before HTTPX can normalize malformed input."""
+    try:
+        if not url or any(ord(c) <= 32 or ord(c) == 127 for c in url) or "\\" in url:
+            raise ValueError("control characters, whitespace or backslash")
+        parts = urlsplit(url)
+        host, port = parts.hostname, parts.port
+        if parts.scheme != "https" or not host or parts.username is not None or parts.password is not None:
+            raise ValueError("HTTPS without credentials is required")
+        if "%" in host or port == 0:
+            raise ValueError("scoped or encoded host, or invalid port")
+        if parts.netloc.endswith(":"):
+            raise ValueError("empty port")
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            host = host.encode("idna").decode("ascii")
+            labels = host.rstrip(".").split(".")
+            if len(host) > 253 or any(
+                not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label) for label in labels
+            ):
+                raise ValueError("invalid DNS hostname") from None
+            literal = False
+        else:
+            literal = True
+    except (ValueError, UnicodeError) as exc:
+        raise NotAuthorized(
+            "Malformed or unauthorized retrieval destination",
+            recovery_hint="Use an HTTPS URL with a valid public hostname and no credentials.",
+        ) from exc
+    return host, port or 443, literal
+
+
 class DefaultNetGuard:
     """Reject malformed destinations and any non-public DNS answer; no DNS cache."""
 
@@ -50,44 +82,16 @@ class DefaultNetGuard:
         self._resolve = resolve
 
     async def check(self, url: str) -> None:
+        await self.resolve_addresses(url)
+
+    async def resolve_addresses(self, url: str) -> tuple[str, ...]:
+        """Resolve once and validate ALL answers before returning numeric destinations."""
+        host, port, literal = validate_destination(url)
         try:
-            if not url or any(ord(c) <= 32 or ord(c) == 127 for c in url) or "\\" in url:
-                raise ValueError("control characters, whitespace or backslash")
-            parts = urlsplit(url)
-            host, port = parts.hostname, parts.port
-            if (
-                parts.scheme != "https"
-                or not host
-                or parts.username is not None
-                or parts.password is not None
-            ):
-                raise ValueError("HTTPS without credentials is required")
-            if "%" in host or port == 0:
-                raise ValueError("scoped or encoded host, or invalid port")
-            if parts.netloc.endswith(":"):
-                raise ValueError("empty port")
-            try:
-                ipaddress.ip_address(host)
-            except ValueError:
-                host = host.encode("idna").decode("ascii")
-                labels = host.rstrip(".").split(".")
-                if len(host) > 253 or any(
-                    not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?", label)
-                    for label in labels
-                ):
-                    raise ValueError("invalid DNS hostname") from None
-                literal = False
-            else:
-                literal = True
-        except (ValueError, UnicodeError) as exc:
-            raise NotAuthorized(
-                "Malformed or unauthorized retrieval destination",
-                recovery_hint="Use an HTTPS URL with a valid public hostname and no credentials.",
-            ) from exc
-        try:
-            addresses = [host] if literal else await self._resolve(host, port or 443)
+            addresses = [host] if literal else await self._resolve(host, port)
             if not addresses or not all(_public(address) for address in addresses):
                 raise ValueError("destination has a non-public or empty DNS answer")
+            return tuple(dict.fromkeys(str(ipaddress.ip_address(address)) for address in addresses))
         except (OSError, ValueError) as exc:
             raise BlockedAddress(
                 "Retrieval destination is not exclusively public",

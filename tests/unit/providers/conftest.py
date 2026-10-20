@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 import respx
 
@@ -58,7 +59,7 @@ def respx_mock() -> Any:
 
 @pytest.fixture
 async def make_client(
-    db: Database, fake_sleep: FakeSleep
+    db: Database, fake_sleep: FakeSleep, respx_mock: Any
 ) -> AsyncIterator[Callable[..., ProviderHttpClient]]:
     made: list[ProviderHttpClient] = []
 
@@ -69,7 +70,12 @@ async def make_client(
         limits: Limits | None = None,
     ) -> ProviderHttpClient:
         client = ProviderHttpClient(
-            snapshot(mode), db, limits or Limits(), sleep=fake_sleep, secrets=secrets or {}
+            snapshot(mode),
+            db,
+            limits or Limits(),
+            sleep=fake_sleep,
+            secrets=secrets or {},
+            download_transport=httpx.MockTransport(respx_mock.async_handler),
         )
         made.append(client)
         return client
