@@ -2,7 +2,7 @@
 
 Source of truth: `docs/spec/refcollector-spec-v3.md`. Scope: P0 backend, spec sections 5–12 and 14.1; proven by 15.3 (P0 tests) and the 16 checklist (W-01..W-31). P1/P2 out; P1 enum values stay out of P0 schemas (spec 3). Decisions: `decisions.md`.
 
-Settings: `DISPATCH_MODE = A` (user relays briefs to Jean/OpenCode), `WORKER_MODEL = 9router/ag/gemini-3.8-flash`, `MAX_PARALLEL = 3`, `BASE_BRANCH = main`, `INTEGRATION_BRANCH = integration`. Check command: `uv run python scripts/check.py` (D-02, D-16).
+Settings: `DISPATCH_MODE = A` (user relays briefs to Jean/OpenCode), `WORKER_MODEL = antigravity/gemini-3.8-flash-high` (backend antigravity, D-24), `MAX_PARALLEL = 3`, `BASE_BRANCH = main`, `INTEGRATION_BRANCH = integration`. Check command: `uv run python scripts/check.py` (D-02, D-16).
 
 P1-only acceptance tests, not built: AT-21, AT-22, AT-27 (Zotero).
 
