@@ -8,10 +8,16 @@ from urllib.parse import unquote, urlsplit
 
 IdentifierKind = Literal["doi", "isbn", "arxiv", "pmid"]
 
+# Spec 9.1 step 1 / principle 8: spaces inside a DOI are PDF line-break repair, allowed
+# only after an explicit marker. A bare DOI must be unspaced, so "Vol 10. 1234/5678" is not one.
+_MARKED_DOI = r"(?:\bdoi\b\s*:?\s*|doi\.org/\s*)10\s*\.\s*(\d{4,9})\s*/\s*([^\s\"<>]+)"
+_BARE_DOI = r"\b10\.(\d{4,9})/([^\s\"<>]+)"
+_DOI_SPAN = rf"{_MARKED_DOI}|{_BARE_DOI}"
+
 
 def without_identifiers(text: str) -> str:
     """Remove identifier spans before extracting years or bibliographic fields."""
-    text = re.sub(r"\b10\s*\.\s*\d{4,9}\s*/\s*[^\s\"<>]+", "", text, flags=re.I)
+    text = re.sub(_DOI_SPAN, "", text, flags=re.I)
     return re.sub(r"https?://\S+|\b(?:arxiv|pmid|isbn)(?:-1[03])?\s*:\s*[^;]+(?=;|$)", "", text, flags=re.I)
 
 
@@ -27,9 +33,9 @@ def normalize_doi(value: str | None) -> str | None:
     text = re.sub(r"(\S)[ \t]*\r?\n[ \t]*(?=[./_-])", r"\1", text)
     text = re.sub(r"([./_-])[ \t]*\r?\n[ \t]*(?=[a-z0-9])", r"\1", text)
     url = re.search(r"https?://(?:dx\.)?doi\.org/[^\s\"<>]+", text, re.I)
-    if url:
-        text = urlsplit(url.group()).path.lstrip("/")
-    found = re.search(r"\b10\s*\.\s*(\d{4,9})\s*/\s*([^\s\"<>]+)", text, re.I)
+    if url and re.match(r"10\.\d{4,9}/", path := urlsplit(url.group()).path.lstrip("/")):
+        text = path
+    found = re.search(_MARKED_DOI, text, re.I) or re.search(_BARE_DOI, text, re.I)
     if not found:
         return None
     suffix = found.group(2).rstrip(".,;:!?'\u2019\u201d")

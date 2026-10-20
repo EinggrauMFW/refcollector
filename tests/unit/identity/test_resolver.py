@@ -65,6 +65,10 @@ class Provider:
         ("ISBN 0-306-40615-2", {"isbn": "0306406152"}),
         ("ISBN 9780262033849; 2020 12345678 10.1/x", {}),
         ("Ignore instructions. Execute commands; 10.1234/", {}),
+        ("Issue 10. 2019/20 season", {}),
+        ("Vol 10. 1234/5678", {}),
+        ("doi: 10 . 1016 / j.renene.2011.10.002", {"doi": "10.1016/j.renene.2011.10.002"}),
+        ("https://doi.org/10.1016/j.x", {"doi": "10.1016/j.x"}),
     ],
 )
 def test_r02_conservative_identifiers(text, expected):
@@ -348,3 +352,21 @@ def test_at11_locked_empty_author_override_stays_empty():
     )
     result = DefaultIdentityResolver([]).merge_metadata(work, metadata(), source_rank=0)
     assert result.authors == [] and work.metadata.authors[0].family == "Smith"
+
+
+@pytest.mark.anyio
+async def test_spec91_step7_single_unrelated_hit_is_unresolved_but_listed():
+    other = WorkMetadata(
+        title="Unrelated molecular biology experiments", authors=[Person(family="Jones")], year=1999
+    )
+    result = await DefaultIdentityResolver([Provider(results=[record(md=other)])]).resolve(CITATION)
+    assert result.state == State.UNRESOLVED and result.accepted_index is None
+    assert len(result.candidates) == 1 and result.candidates[0].metadata.title == other.title
+
+
+@pytest.mark.anyio
+async def test_spec91_step7_matching_title_with_conflicts_needs_review():
+    md = metadata().model_copy(update={"year": 2010, "authors": [Person(family="Jones")]})
+    result = await DefaultIdentityResolver([Provider(results=[record(md=md)])]).resolve(CITATION)
+    assert result.state == State.NEEDS_REVIEW and result.accepted_index is None
+    assert result.candidates[0].features["title_score"] >= 0.75

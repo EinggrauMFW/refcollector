@@ -339,7 +339,10 @@ class DefaultIdentityResolver:
         if failed:
             reasons.append(R.PROVIDER_UNAVAILABLE)
         accepted_index = None
-        state = State.NEEDS_REVIEW if candidates else State.UNRESOLVED
+        # Spec 9.1 step 7 (D-31): no identifier-linked candidate and none reaching the title
+        # threshold means no acceptable candidate. Weak candidates stay listed for a reviewer.
+        weak_only = not any(c.identifier_linked or c.features["title_score"] >= 0.75 for c in candidates)
+        state = State.NEEDS_REVIEW if candidates and not weak_only else State.UNRESOLVED
         if candidates:
             top = candidates[0]
             close = len(candidates) > 1 and close_candidates(top, candidates[1])
