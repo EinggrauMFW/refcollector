@@ -1,1 +1,5 @@
-"""WP-05: full JSON and unresolved-list renderers. Spec 12.1."""
+"""JSON renderer helpers."""
+
+from . import _rows_json
+
+__all__ = ["_rows_json"]

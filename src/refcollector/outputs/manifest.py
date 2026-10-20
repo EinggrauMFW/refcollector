@@ -1,1 +1,10 @@
-"""WP-05: manifest.json. Spec 12.1, 11.4 tool 19."""
+"""Manifest helpers."""
+
+import hashlib
+
+
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+__all__ = ["sha256"]

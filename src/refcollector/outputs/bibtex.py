@@ -1,1 +1,5 @@
-"""WP-05: BibTeX renderer (bibtexparser v2). Spec 12.1."""
+"""BibTeX renderer helpers."""
+
+from . import _bib, _records
+
+__all__ = ["_bib", "_records"]

@@ -1,1 +1,5 @@
-"""WP-05: request drafts (.txt bundle, .eml), en and id. Spec 12.2."""
+"""Request draft renderer."""
+
+from . import DefaultDraftRenderer
+
+__all__ = ["DefaultDraftRenderer"]
