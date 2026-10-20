@@ -7,9 +7,9 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 | C | Contracts freeze v1 | 1 | main | orchestrator | merged | check green: 20 passed | commit "contracts: freeze v1" |
 | 01 | storage | A | wp/01 | 252bef5f-1bb1-48b2-8a5f-d27c6ff83f27 | merged | 39 passed in worktree; integration 121 passed | Claude subagent (D-25); commit ca1094b; merged --no-ff into integration |
 | 02 | executor | A | wp/02 | 287686b7-6c0a-4566-ae61-8b16a259a6cf | merged | 62 passed in worktree; integration 121 passed | Claude subagent (D-25); commit 180a6d0 + fix 3d095b1; merged --no-ff into integration |
-| 03 | extraction | A | wp/03 | Codex (user-run) | planned | not run | brief ready: briefs/wp-03.md |
+| 03 | extraction | A | wp/03 | 9256c3c8-3378-42e2-9840-8d7dc402b147 | merged | independently verified: 223 passed; integration 327 passed | gpt-6.1-sol completed; commit 82b5391; merged --no-ff into integration |
 | 04 | providers | A | wp/04 | 5ec5f7a2-d396-4140-8146-bfc3b5a952b4 | merged | 60 passed in worktree; integration 121 passed | Claude subagent (D-25); commit 26b46ad; merged --no-ff into integration |
-| 05 | outputs | A | wp/05 | Codex (user-run) | planned | not run | brief ready: briefs/wp-05.md |
+| 05 | outputs | A | wp/05 | 1a23156f-2cba-4e7c-a8ea-f5ba78dc72c0 | merged | independently verified: 225 passed; integration 327 passed | gpt-6.1-sol completed; commits 5c4c442 + c9a8ea1; merged --no-ff into integration |
 | 06 | identity | B | wp/06 | — | planned | not run | needs 04 |
 | 07 | access | B | wp/07 | — | planned | not run | needs 04 |
 | 08 | files | B | wp/08 | — | planned | not run | needs 01, 04 |
@@ -47,3 +47,7 @@ Merged into `integration` (--no-ff); full check on integration: 121 passed. Next
 The user runs WP-03 (extraction) and WP-05 (outputs) with Codex.
 Briefs: `briefs/wp-03.md`, `briefs/wp-05.md`. Branches `wp/03` and `wp/05` start from `integration` (this commit).
 Review gate unchanged: owned paths only, orchestrator reads the diff and runs `uv run python scripts/check.py`, then merges --no-ff into `integration`.
+
+## Wave A completion - 2026-10-20
+
+Reviewed WP-03 and WP-05 production changes and requirement tests. No merge-blocking defect found in reviewed code. Verified owned-path boundaries. Independently ran the required check in both worker worktrees: 223 and 225 passed. Merged both branches into integration with --no-ff. Combined check: lint and formatting passed; 327 passed in 18.57s. No push. Wave B packages remain planned.
