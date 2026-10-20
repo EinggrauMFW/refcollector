@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "paperId": "abc123",
+      "externalIds": {},
+      "title": "Parsing References at Scale",
+      "year": 2019,
+      "venue": "Proc. Example Conf.",
+      "publicationTypes": ["Conference"],
+      "authors": [{"authorId": "3", "name": "Alan Mathison Turing"}],
+      "openAccessPdf": null,
+      "matchScore": 180.5
+    }
+  ]
+}

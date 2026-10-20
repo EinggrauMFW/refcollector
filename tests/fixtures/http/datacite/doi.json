@@ -1,0 +1,19 @@
+{
+  "data": {
+    "id": "10.5281/zenodo.42",
+    "type": "dois",
+    "attributes": {
+      "doi": "10.5281/ZENODO.42",
+      "url": "https://zenodo.org/records/42",
+      "titles": [{"title": "Example Dataset of Citations"}],
+      "creators": [
+        {"name": "Hopper, Grace", "nameType": "Personal", "givenName": "Grace", "familyName": "Hopper"},
+        {"name": "CERN", "nameType": "Organizational"}
+      ],
+      "publisher": {"name": "Zenodo"},
+      "publicationYear": "2020",
+      "container": {},
+      "types": {"resourceTypeGeneral": "Dataset", "resourceType": ""}
+    }
+  }
+}

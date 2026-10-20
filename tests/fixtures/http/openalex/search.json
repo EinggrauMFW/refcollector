@@ -1,0 +1,19 @@
+{
+  "meta": {"count": 1, "per_page": 5, "page": 1},
+  "results": [
+    {
+      "id": "https://openalex.org/W99",
+      "doi": null,
+      "title": "A Report Without DOI",
+      "display_name": "A Report Without DOI",
+      "publication_year": 2015,
+      "type": "report",
+      "type_crossref": "report",
+      "authorships": [{"author": {"display_name": "Grace Hopper"}}],
+      "primary_location": null,
+      "best_oa_location": null,
+      "locations": [],
+      "biblio": {"volume": null, "issue": null, "first_page": null, "last_page": null}
+    }
+  ]
+}

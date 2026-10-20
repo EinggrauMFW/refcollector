@@ -1,0 +1,16 @@
+{
+  "type": "article-journal",
+  "DOI": "10.3000/MEDRA.7",
+  "URL": "https://doi.org/10.3000/medra.7",
+  "title": "An mEDRA Registered Article",
+  "author": [
+    {"family": "Noether", "given": "Emmy"},
+    {"literal": "Plato"}
+  ],
+  "container-title": "Rivista di Esempi",
+  "volume": "4",
+  "issue": "1",
+  "page": "1-10",
+  "publisher": "Esempi Editore",
+  "issued": {"date-parts": [[2018, 1, 2]]}
+}
