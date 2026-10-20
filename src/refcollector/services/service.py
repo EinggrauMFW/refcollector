@@ -746,7 +746,16 @@ class RefCollectorServiceImpl:
                 )
             if cap is not None:
                 planned = min(planned, cap)
-            link = list(scope.occurrence_ids) if isinstance(scope, api.OccurrenceScope) else []
+            link = []
+            if isinstance(scope, api.OccurrenceScope):
+                selected = [
+                    o
+                    for o in self._scope_occurrences(req.project_id, scope)
+                    if o.extraction != ExtractionState.EXCLUDED
+                ]
+                if cap is not None:
+                    selected = selected[:cap]
+                link = [o.occurrence_id for o in selected]
             return planned, link
 
         def fn(tx: Tx, _: Any) -> api.StartJobOut:

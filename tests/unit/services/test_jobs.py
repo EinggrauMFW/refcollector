@@ -126,6 +126,24 @@ def test_start_job_validations(env):
     assert out.steps_planned == 1
 
 
+def test_capped_explicit_scope_reports_only_selected_occurrences(env):
+    pid = env.project()
+    sid = env.text_source(pid)
+    rows = [env.occ(pid, sid), env.occ(pid, sid)]
+    out = start(
+        env,
+        pid,
+        ["resolve"],
+        {"occurrence_ids": [row.occurrence_id for row in rows]},
+        options={"max_occurrences": 1},
+    )
+    got = env.svc.get_job(env.ctx, GetJobIn(project_id=pid, job_id=out.job_id))
+    assert out.steps_planned == 1
+    assert got.results.occurrence_count == 1
+    listed = env.svc.list_references(env.ctx, ListReferencesIn(project_id=pid, filter={"job_id": out.job_id}))
+    assert [row["occurrence_id"] for row in listed.occurrences] == [rows[0].occurrence_id]
+
+
 def test_start_job_scope_per_stage(env):
     pid = env.project()
     sid = env.text_source(pid)
