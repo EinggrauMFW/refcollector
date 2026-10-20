@@ -183,6 +183,17 @@ async def _chunks(*parts: bytes, delay: float = 0) -> AsyncIterator[bytes]:
         yield part
 
 
+class _Stream(httpx.AsyncByteStream):
+    """Explicit MockTransport requires the public HTTPX stream interface."""
+
+    def __init__(self, parts: AsyncIterator[bytes]) -> None:
+        self.parts = parts
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        async for part in self.parts:
+            yield part
+
+
 def _dl(client, dest, guard=None, *, url=PDF, **kw):
     args = {"max_bytes": 1000, "timeout_s": 5.0, "max_redirects": 3, **kw}
     return client.download(url, dest=dest, guard=guard or _Guard(), **args)
@@ -208,7 +219,7 @@ async def test_download_requires_retrieval_mode(client, respx_mock, tmp_path) ->
 
 async def test_download_too_large_leaves_no_file(make_client, respx_mock, tmp_path) -> None:
     respx_mock.get(PDF).respond(200, content=b"x" * 100)
-    respx_mock.get(PDF + "?s").respond(200, stream=_chunks(b"x" * 8, b"x" * 8))
+    respx_mock.get(PDF + "?s").respond(200, stream=_Stream(_chunks(b"x" * 8, b"x" * 8)))
     client = make_client(NetworkMode.RETRIEVAL)
     dest = tmp_path / "a.pdf"
     with pytest.raises(LimitExceeded):
@@ -247,8 +258,8 @@ async def test_download_too_many_redirects(make_client, respx_mock, tmp_path) ->
 
 
 async def test_download_cancelled_mid_stream(make_client, respx_mock, tmp_path) -> None:
-    respx_mock.get(PDF).respond(200, stream=_chunks(b"%PDF", b"more", b"end"))
-    seen = iter([False, True])
+    respx_mock.get(PDF).respond(200, stream=_Stream(_chunks(b"%PDF", b"more", b"end")))
+    seen = iter([False, False, True])  # pre-request check, first chunk, second chunk
     dest = tmp_path / "a.pdf"
     with pytest.raises(Cancelled):
         await _dl(make_client(NetworkMode.RETRIEVAL), dest, is_cancelled=lambda: next(seen, True))
@@ -256,7 +267,7 @@ async def test_download_cancelled_mid_stream(make_client, respx_mock, tmp_path) 
 
 
 async def test_download_timeout_is_transient(make_client, respx_mock, tmp_path) -> None:
-    respx_mock.get(PDF).respond(200, stream=_chunks(b"%PDF", b"late", delay=0.2))
+    respx_mock.get(PDF).respond(200, stream=_Stream(_chunks(b"%PDF", b"late", delay=0.2)))
     dest = tmp_path / "a.pdf"
     with pytest.raises(TransientNetworkError):
         await _dl(make_client(NetworkMode.RETRIEVAL), dest, timeout_s=0.05)
