@@ -834,3 +834,83 @@ def test_review_reject(env):
     assert decision.action == DecisionAction.REJECT and decision.provenance.origin == Origin.INTERACTIVE
     with pytest.raises(RevisionConflict):  # stale revision
         env.svc.review_decision(env.tty, req.model_copy(update={"idempotency_key": key()}))
+
+
+@pytest.mark.parametrize("action", ["select", "review"])
+def test_accept_shared_metadata_stales_other_approval(env, action):
+    pid, sid = setup(env)
+    first, second = env.occ(pid, sid), env.occ(pid, sid)
+    original = env.candidate(pid, first.occurrence_id, title="Approved title")
+    user_accept(env, pid, first, original)
+    changed = env.candidate(pid, second.occurrence_id, title="Changed title")
+    out = (select if action == "select" else user_accept)(env, pid, second, changed)
+    assert {r.occurrence_id for r in out.changed} == {first.occurrence_id, second.occurrence_id}
+    got = env.store.occurrences.get(pid, first.occurrence_id)
+    assert got.identity == IdentityState.NEEDS_REVIEW
+    assert ReasonCode.APPROVAL_STALE in got.identity_reasons
+    assert got.approval is None
+    assert AuditEventType.APPROVAL_STALE in [
+        e.type for e in env.store.audit.list(pid, subject_id=first.occurrence_id)
+    ]
+
+
+def test_set_doi_after_approval_records_staleness(env):
+    pid, sid = setup(env)
+    occ = env.occ(pid, sid)
+    cand = env.candidate(pid, occ.occurrence_id)
+    user_accept(env, pid, occ, cand)
+    current = env.store.occurrences.get(pid, occ.occurrence_id)
+    env.identity.result = resolution(IdentityState.ACCEPTED_AUTO, scored(), accepted_index=0)
+    upd(
+        env,
+        pid,
+        {
+            "type": "set_doi",
+            "occurrence_id": occ.occurrence_id,
+            "doi": "10.1234/test",
+            "expected_revision": current.revision,
+        },
+    )
+    got = env.store.occurrences.get(pid, occ.occurrence_id)
+    assert got.identity == IdentityState.NEEDS_REVIEW
+    assert ReasonCode.APPROVAL_STALE in got.identity_reasons
+    assert got.approval is None
+    assert AuditEventType.APPROVAL_STALE in [
+        e.type for e in env.store.audit.list(pid, subject_id=occ.occurrence_id)
+    ]
+
+
+def test_reject_approved_candidate_records_staleness(env):
+    pid, sid = setup(env)
+    occ = env.occ(pid, sid)
+    cand = env.candidate(pid, occ.occurrence_id)
+    user_accept(env, pid, occ, cand)
+    current = env.store.occurrences.get(pid, occ.occurrence_id)
+    upd(
+        env,
+        pid,
+        {
+            "type": "reject_candidate",
+            "occurrence_id": occ.occurrence_id,
+            "candidate_id": cand.candidate_id,
+            "expected_revision": current.revision,
+        },
+    )
+    got = env.store.occurrences.get(pid, occ.occurrence_id)
+    assert got.identity == IdentityState.NEEDS_REVIEW
+    assert ReasonCode.APPROVAL_STALE in got.identity_reasons
+    assert AuditEventType.APPROVAL_STALE in [
+        e.type for e in env.store.audit.list(pid, subject_id=occ.occurrence_id)
+    ]
+
+
+def test_accept_same_shared_metadata_preserves_other_approval(env):
+    pid, sid = setup(env)
+    first, second = env.occ(pid, sid), env.occ(pid, sid)
+    original = env.candidate(pid, first.occurrence_id)
+    user_accept(env, pid, first, original)
+    before = env.store.occurrences.get(pid, first.occurrence_id)
+    same = env.candidate(pid, second.occurrence_id)
+    out = select(env, pid, second, same)
+    assert [r.occurrence_id for r in out.changed] == [second.occurrence_id]
+    assert env.store.occurrences.get(pid, first.occurrence_id) == before

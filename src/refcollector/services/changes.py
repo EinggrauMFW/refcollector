@@ -155,7 +155,9 @@ def _filled(meta: WorkMetadata) -> dict[str, Any]:
     return {k: v for k, v in meta.model_dump().items() if v not in (None, "", [])}
 
 
-def accept_work(svc: RefCollectorServiceImpl, tx: Tx, cand: Candidate) -> ProjectWork:
+def accept_work(
+    svc: RefCollectorServiceImpl, tx: Tx, cand: Candidate
+) -> tuple[ProjectWork, list[Occurrence]]:
     """Find or create the project's work for an accepted candidate (AT-18: one work per DOI).
 
     Works are per project (AT-42/43); metadata merge respects locks via the resolver (9.4).
@@ -169,7 +171,7 @@ def accept_work(svc: RefCollectorServiceImpl, tx: Tx, cand: Candidate) -> Projec
         work = svc.store.works.find_by_link_key(pid, "openalex_id", meta.openalex_id)
     links = {k: v for k, v in (("doi", meta.doi), ("openalex_id", meta.openalex_id)) if v}
     if work is None:
-        return svc.store.works.add(
+        work = svc.store.works.add(
             ProjectWork(
                 work_id=new_id("work"),
                 project_id=pid,
@@ -178,15 +180,19 @@ def accept_work(svc: RefCollectorServiceImpl, tx: Tx, cand: Candidate) -> Projec
                 link_keys=links,
             )
         )
+        return work, []
     resolver = svc.identity_factory(svc.snapshot(tx.project))
     merged = resolver.merge_metadata(work, meta, source_rank=rank)
     ranks = dict(work.metadata_source_ranks)
     for name, value in merged.model_dump().items():
         if value != getattr(work.metadata, name):
             ranks[name] = rank
+    changed = merged != work.metadata
     work.metadata, work.metadata_source_ranks = merged, ranks
     work.link_keys = {**links, **work.link_keys}
-    return svc.store.works.update(work)
+    work = svc.store.works.update(work)
+    others = _stale_sharing(svc, tx, work.work_id, cand.occurrence_id) if changed else []
+    return work, others
 
 
 def candidate_of(svc: RefCollectorServiceImpl, tx: Tx, occ: Occurrence, candidate_id: str) -> Candidate:
@@ -205,13 +211,15 @@ def _reject(svc: RefCollectorServiceImpl, tx: Tx, occ: Occurrence, cand: Candida
         for c in svc.store.candidates.list_for_occurrence(occ.project_id, occ.occurrence_id)
         if not c.rejected
     ]
+    approved = occ.identity == IdentityState.ACCEPTED_USER and occ.approval is not None
+    stale(tx, occ)
     if occ.accepted_candidate_id == cand.candidate_id:
         unaccept(occ)
-        occ.identity = IdentityState.NEEDS_REVIEW if remaining else IdentityState.REJECTED
-        occ.identity_reasons = []
+        occ.identity = IdentityState.NEEDS_REVIEW if remaining or approved else IdentityState.REJECTED
+        if not approved:
+            occ.identity_reasons = []
     else:
-        stale(tx, occ)
-        if not remaining and occ.identity == IdentityState.NEEDS_REVIEW:
+        if not remaining and not approved and occ.identity == IdentityState.NEEDS_REVIEW:
             occ.identity = IdentityState.REJECTED
     return list(cand.reasons)
 
@@ -343,12 +351,12 @@ def select_candidate(svc: RefCollectorServiceImpl, tx: Tx, c: SelectCandidate, _
     cand = candidate_of(svc, tx, occ, c.candidate_id)
     if cand.rejected:
         raise InvalidState("candidate was rejected and cannot be accepted")
-    work = accept_work(svc, tx, cand)
+    work, others = accept_work(svc, tx, cand)
     occ.work_id, occ.accepted_candidate_id, occ.approval = work.work_id, cand.candidate_id, None
     occ.identity, occ.identity_reasons = IdentityState.ACCEPTED_AGENT, list(cand.reasons)
     new = save(svc, occ, c.expected_revision)
     record_decision(svc, tx, new, DecisionAction.ACCEPT, cand.candidate_id, list(cand.reasons), c.note)
-    return [new], [], new
+    return [new, *others], [], new
 
 
 def reject_candidate(svc: RefCollectorServiceImpl, tx: Tx, c: RejectCandidate, _: Any) -> Outcome:
@@ -423,17 +431,23 @@ def set_doi(svc: RefCollectorServiceImpl, tx: Tx, c: SetDoi, result: ResolutionR
         x.rank = len(fresh) + i + 1
     svc.store.candidates.replace_for_occurrence(pid, occ.occurrence_id, [*fresh, *kept])
     tx.audit(AuditEventType.CANDIDATES_UPDATED, occ.occurrence_id, count=len(fresh), source="set_doi")
+    was_approved = occ.identity == IdentityState.ACCEPTED_USER and occ.approval is not None
+    stale(tx, occ)
     accepted = None
+    others = []
     if result.state == IdentityState.ACCEPTED_AUTO and result.accepted_index is not None:
         accepted = fresh[result.accepted_index] if result.accepted_index < len(fresh) else None
     if accepted is not None:
-        work = accept_work(svc, tx, accepted)
+        work, others = accept_work(svc, tx, accepted)
         occ.work_id, occ.accepted_candidate_id, occ.approval = work.work_id, accepted.candidate_id, None
         occ.identity, occ.identity_reasons = IdentityState.ACCEPTED_AGENT, list(accepted.reasons)
     else:
         unaccept(occ)
         occ.identity = IdentityState.NEEDS_REVIEW
         occ.identity_reasons = list(result.reasons)
+    if was_approved:
+        occ.identity = IdentityState.NEEDS_REVIEW
+        occ.identity_reasons = list(dict.fromkeys([ReasonCode.APPROVAL_STALE, *occ.identity_reasons]))
     new = save(svc, occ, c.expected_revision)
     record_decision(
         svc,
@@ -443,7 +457,7 @@ def set_doi(svc: RefCollectorServiceImpl, tx: Tx, c: SetDoi, result: ResolutionR
         accepted.candidate_id if accepted else None,
         list(new.identity_reasons),
     )
-    return [new], [], new
+    return [new, *others], [], new
 
 
 def _work_for(svc: RefCollectorServiceImpl, tx: Tx, occ: Occurrence) -> ProjectWork:
@@ -536,7 +550,7 @@ def review(svc: RefCollectorServiceImpl, tx: Tx, req: ReviewDecisionIn) -> Outco
         return [new], [], new
     if cand.rejected:
         raise InvalidState("candidate was rejected and cannot be accepted")
-    work = accept_work(svc, tx, cand)
+    work, others = accept_work(svc, tx, cand)
     occ.work_id, occ.accepted_candidate_id = work.work_id, cand.candidate_id
     occ.identity, occ.identity_reasons = IdentityState.ACCEPTED_USER, list(cand.reasons)
     # The commit that records the approval bumps the revision and stores the new value (D-20, W-18).
@@ -561,4 +575,4 @@ def review(svc: RefCollectorServiceImpl, tx: Tx, req: ReviewDecisionIn) -> Outco
     record_decision(
         svc, tx, new, DecisionAction.ACCEPT, cand.candidate_id, list(cand.reasons), req.note, approval
     )
-    return [new], [], new
+    return [new, *others], [], new
