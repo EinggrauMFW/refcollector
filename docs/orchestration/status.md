@@ -101,3 +101,34 @@ Jean created wp/10 from clean integration base 6270605466d1a66648c982ad1955f1fab
 ## WP-10 launch fallback - 2026-10-20
 
 The first Sonnet launch failed before any source edit. Jean.log records a Claude API session-limit error with reset 02:40 Asia/Bangkok; Jean represented this as cancelled. Retried the same worktree/session and committed brief with backend codex, model gpt-6.1-sol, effort high. No user cancellation was inferred. This is a WP-10 launch fallback, not a change to earlier source verification. Implementation remains pending.
+
+## WP-10 completion and workflow verification - 2026-10-21
+
+WP-10 is merged at `0d41c8e`. Implementation `1eb1987` composes the six handlers,
+real services, executor, SQLite, provider clients and renderers. Native PDF calls use
+one shared owner thread in `ba9e0c2`; all AppHandles share the same native boundary.
+Root review corrected conflicting canonical keys in `7aba5d4` after two failing
+regressions. Every matched DOI/OpenAlex key must agree before a work is merged.
+Root also corrected explicit occurrence-scope cap result links in `6a3d1a1`.
+
+The reviewed fixes cover automatic unresolved provenance, shared-work mutation,
+approval staleness, downstream access reset, terminal/empty-stage client cleanup,
+cancellation-safe client closure, native PDF concurrency and canonical conflicts.
+Independent final WP-10 worktree gate: lint/format passed, 1,005 tests passed in 43.34s.
+
+Final integration gate: `uv run python scripts/check.py` passed lint, formatting and
+1,017 tests in 86.36s. This includes four public CLI workflows, five SDK MCP workflows
+and two real process-kill cases with separate CLI and SDK restarts. Checkpoints prove
+succeeded work was not repeated; verified file hashes and state survived the kill.
+
+A separate native Windows PTY run used real `msvcrt.getwch`, without TTY/input patches
+or a fabricated approval context. One test-driver `a` key created a `cli_tty` approval
+at occurrence revision 5. Edits, locks and that approval survived executor loss; a later
+SDK edit invalidated the approval and retained its decision/audit history.
+
+Acceptance is not an all-pass release claim. CLI source/artifact readback is incomplete,
+and several CLI-specific scenarios remain partial or pending. MCP approval stays
+forbidden; W-17 and W-18 use their required native surfaces. Full evidence and remaining
+gaps are in `acceptance.md`. No live providers, stdio clients or web environment were
+tested. No push occurred. Next work: close CLI readback gaps and remaining CLI cases,
+then complete the release/license and benchmark gates before a P0 release claim.
