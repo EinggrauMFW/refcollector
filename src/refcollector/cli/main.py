@@ -53,9 +53,14 @@ from refcollector.contracts.api import (
     GetReferenceIn,
     GetSourceIn,
     ImportSourceIn,
+    ListArtifactsIn,
+    ListArtifactsOut,
     ListProjectsIn,
     ListReferencesIn,
+    ListSourcesIn,
+    ListSourcesOut,
     Merge,
+    ReadArtifactIn,
     RefCollectorService,
     Restore,
     SetSourceSectionsIn,
@@ -85,6 +90,7 @@ from refcollector.domain.enums import (
 from refcollector.errors import (
     FeatureNotAvailable,
     IntegrationUnavailable,
+    InvalidInput,
     RcError,
     RevisionConflict,
 )
@@ -95,7 +101,9 @@ app = typer.Typer(
 )
 project_app = typer.Typer(no_args_is_help=True, help="Create, list and show projects.")
 config_app = typer.Typer(no_args_is_help=True, help="Settings, allowed folders, API keys, permissions.")
+artifact_app = typer.Typer(no_args_is_help=True, help="Read export artifacts.")
 app.add_typer(project_app, name="project")
+app.add_typer(artifact_app, name="artifact")
 app.add_typer(config_app, name="config")
 
 _sleep = time.sleep  # tests replace this; `run --wait` and `serve` use it
@@ -379,10 +387,37 @@ def import_source(
             {"project_id": project_id(), "input": source, "idempotency_key": idem(idempotency_key)}
         ),
     )
-    p = out.preflight
     echo(f"source {out.source_id}" + ("  (already imported)" if out.reused else ""))
-    echo(f"pages {p.pages}  text coverage {p.text_coverage:.0%}  estimated entries {p.estimated_entries}")
-    echo("\n".join(f"warning: {w}" for w in p.warnings))
+    echo(render.preflight(out.preflight))
+
+
+Limit = Annotated[int | None, typer.Option("--limit", min=1, max=100, help="Page size; one page only.")]
+Cursor = Annotated[str | None, typer.Option("--cursor", help="Continue after this cursor.")]
+
+
+@app.command("sources")
+@guard
+def sources(limit: Limit = None, cursor: Cursor = None, as_json: AsJson = False) -> None:
+    """List sources. Without --limit/--cursor, pages through all of them."""
+    pid = project_id()
+    one_page = limit is not None or cursor is not None
+    items = []
+    while True:
+        out = svc().list_sources(new_ctx(), ListSourcesIn(project_id=pid, cursor=cursor, limit=limit))
+        items += out.sources
+        cursor = out.next_cursor
+        if one_page or not cursor:
+            break
+    out = ListSourcesOut(sources=items, next_cursor=cursor)
+    render.dump_json(out) if as_json else echo(render.source_list(out))
+
+
+@app.command("source")
+@guard
+def source_show(source_id: str, as_json: AsJson = False) -> None:
+    """Show one source: preflight, sections, extraction state and warnings."""
+    out = svc().get_source(new_ctx(), GetSourceIn(project_id=project_id(), source_id=source_id))
+    render.dump_json(out) if as_json else echo(render.source(out))
 
 
 _RANGE = re.compile(r"(\d+)(?:-(\d+))?")
@@ -718,6 +753,68 @@ def exclude(
 
 
 # ---------- files, exports, drafts ----------
+
+
+@app.command("artifacts")
+@guard
+def artifacts(
+    kind: Annotated[str | None, typer.Option("--kind", help="Artifact kind, e.g. manifest.")] = None,
+    limit: Limit = None,
+    cursor: Cursor = None,
+    as_json: AsJson = False,
+) -> None:
+    """List export artifacts. Without --limit/--cursor, pages through all of them."""
+    pid = project_id()
+    one_page = limit is not None or cursor is not None
+    items = []
+    while True:
+        out = svc().list_artifacts(
+            new_ctx(), ListArtifactsIn(project_id=pid, kind=kind, cursor=cursor, limit=limit)
+        )
+        items += out.artifacts
+        cursor = out.next_cursor
+        if one_page or not cursor:
+            break
+    out = ListArtifactsOut(artifacts=items, next_cursor=cursor)
+    render.dump_json(out) if as_json else echo(render.artifact_list(out.artifacts, out.next_cursor))
+
+
+@artifact_app.command("read")
+@guard
+def artifact_read(
+    artifact_id: str,
+    offset: Annotated[int, typer.Option("--offset", min=0, help="Start byte.")] = 0,
+    length: Annotated[int | None, typer.Option("--length", min=1, max=65536, help="Max bytes.")] = None,
+    all_: Annotated[bool, typer.Option("--all", help="Read every chunk until end of file.")] = False,
+    as_json: AsJson = False,
+) -> None:
+    """Read artifact text. --json prints the exact text; plain output is cleaned for the terminal."""
+    pid = project_id()
+    ctx = new_ctx()
+
+    def chunk(at: int) -> Any:
+        req = ReadArtifactIn(project_id=pid, artifact_id=artifact_id, offset=at, length=length)
+        return svc().read_artifact(ctx, req)
+
+    out = chunk(offset)
+    if all_ and out.text is not None:
+        parts = [out.text]
+        while not out.eof:
+            offset += len(parts[-1].encode())  # service offsets are UTF-8 bytes
+            out = chunk(offset)
+            if not out.text:
+                raise InvalidInput(f"read at byte {offset} returned no text before end of file")
+            parts.append(out.text)
+        out = out.model_copy(update={"text": "".join(parts)})
+    if as_json:
+        render.dump_json(out)
+    elif out.text is None:
+        echo("binary artifact; no text. Descriptor:")
+        echo(render.artifact_list([out.descriptor]))
+    else:
+        echo(out.text)
+        if not all_:
+            echo("eof" if out.eof else f"next offset: {offset + len(out.text.encode())}", err=True)
 
 
 @app.command("attach")
