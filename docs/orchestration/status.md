@@ -14,10 +14,11 @@ States: planned, dispatched, in_review, changes_requested, merged, blocked.
 | 07 | access | B | wp/07 | 09a55586-2910-4752-8357-7ac15d93b5d8 | merged | 432 passed in worktree; integration 739 passed | 76073bb, d1e3a00; Sonnet review verdict MERGE |
 | 08 | files | B | wp/08 | 7404fcf8-4e0b-417a-a6a4-6d9cc670b465 | merged | 500 passed in worktree; integration 739 passed | bac12c3, d315d79 (DNS pinning), bd9034a (title match, off-loop verify, version reason, site-local) |
 | 09 | services | C | wp/09 | reviewed by Codex | merged | initial independent 823 passed; corrected 841 passed; integration 938 passed | 1af065f + a0130ca + 0228b85; approval staleness, transactional preconditions, UTF-8 paging fixes |
-| 10 | pipeline | C | wp/10 | 8bcfe954-ed5a-4657-96ff-c01fdd183a68 | dispatched | pending; base integration 938 passed | Codex gpt-6.1-sol/high fallback after Claude session quota; base 6270605; briefs/wp-10.md |
+| 10 | pipeline | C | wp/10 | 8bcfe954-ed5a-4657-96ff-c01fdd183a68 | merged | integration 1017 passed | Codex gpt-6.1-sol/high fallback after Claude session quota; base 6270605; briefs/wp-10.md |
 | 11 | mcp | C | wp/11 | reviewed by Codex | merged | independent 764 passed; integration 938 passed | d4502dc; no confirmed review defect |
 | 12 | cli | C | wp/12 | reviewed by Codex | merged | initial independent 803 passed; corrected 811 passed; integration 938 passed | b222f87 + 88fca3c; terminal input and live-candidate paging fixes |
-| D | integration + acceptance | D | integration | orchestrator | planned | not run | |
+| 13 | CLI readback + acceptance gaps | D | wp/13 | Sonnet subagent | merged | 1036 passed | c18f66e, 5c6e92d, dbfe6bf |
+| D | integration + acceptance | D | integration | orchestrator | in_review | 1036 passed | W-01..W-31 evidenced on CLI and MCP (W-17 MCP-only, W-18 CLI TTY-only); see acceptance.md |
 
 ## Orchestrator handoff - 2026-10-20
 

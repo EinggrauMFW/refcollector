@@ -115,3 +115,11 @@ guard restored execution. The shared guard still rejects provider sockets and DN
 
 Jean reported no running environment for the integration worktree. No web server
 was started. All tests used isolated temporary directories; no URL or port was used.
+
+## WP-13 merge - 2026-10-21
+
+CLI readback commands (`sources`, `source`, `artifacts`, `artifact read`) and CLI-only acceptance
+tests merged from `wp/13` (c18f66e, 5c6e92d, dbfe6bf). Orchestrator gate on the worktree and on
+integration after the merge: lint and format passed; 1,036 passed. W-19 CLI evidence is the native
+ConPTY run of `tty_approval_smoke.py cli` (exit 0, `passed_cli_edit`), not a pytest case.
+Remaining limit: W-13 lineage is shown from history events only; no public successor-to-original field.
