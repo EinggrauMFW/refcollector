@@ -2,9 +2,9 @@
 
 Only HTTP responses and DNS are replaced. Every invocation opens/closes the real
 app, service, executor and SQLite store. No direct store setup or assertions.
-CliRunner does not prove real TTY approval or process-kill recovery. CLI lacks
-source/artifact readback: sections, lineage, complete-audit contents, manifest
-hashes and bounded artifact reads remain outside this file's proof.
+CliRunner does not prove real TTY approval or process-kill recovery. Source and
+artifact readback (sections, lineage, audit contents, manifest hashes, bounded
+reads) is proved in test_cli_gaps.py.
 """
 
 import hashlib
@@ -44,11 +44,11 @@ class Commands:
     def import_text(self, text=TEXT):
         return re.search(r"src_[A-Z0-9]+", self.run("import", "--text", text))[0]
 
-    def job(self, *args):
+    def job(self, *args, states=("completed",)):
         output = self.run(*args, "--wait")
         jid = re.search(r"job (job_[A-Z0-9]+)", output)[1]
         result = self.read("jobs", jid)
-        assert result["state"] == "completed", result
+        assert result["state"] in states, result
         return jid, result
 
     def rows(self, *args):

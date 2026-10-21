@@ -1,8 +1,9 @@
 """Manual native-TTY W-18/W-19/W-30 proof; not collected by pytest.
 
-Run: python -m tests.acceptance.tty_approval_smoke, then press ONE `a` when
-the real CLI review asks. Do not pipe input. Public service calls prepare and
-read data; only the production CLI records approval. The final edit uses the
+Run: python -m tests.acceptance.tty_approval_smoke [mcp|cli], then press ONE `a` when
+the real CLI review asks. Do not pipe input. The optional argument picks the surface
+for the final edit that stales the approval (default mcp; cli runs `refcollector edit`).
+Public service calls prepare and read data; only the production CLI records approval. The final edit uses the
 actual MCP SDK Client. HTTP responses alone are faked; live sockets/DNS fail.
 Public JSON export supplements get_reference, whose occurrence summary does
 not expose the current approval. No store/SQL setup or assertions are used.
@@ -156,7 +157,19 @@ async def mcp_edit(handle, pid, oid, revision):
         assert not result.is_error, result.structured_content
 
 
-def exercise(folder):
+def cli_edit(pid, oid, revision):
+    cli_main.set_app_factory(None)
+    try:
+        cli_main.app(
+            ["--project", pid, "edit", oid, "--text", "After approval: " + TEXT]
+            + ["--expected-revision", str(revision), "--idempotency-key", "cli-edit-stales-approval"],
+            standalone_mode=False,
+        )
+    finally:
+        cli_main._close_app()
+
+
+def exercise(folder, edit_via="mcp"):
     assert sys.stdin.isatty() and sys.stdout.isatty(), "Native stdin/stdout TTY required"
     settings = Settings(
         rc_home=folder / "home",
@@ -251,7 +264,10 @@ def exercise(folder):
         }
         assert after["locks"]["title"]
         assert exported_occurrence(handle, pid, oid, "resumed-json") == approved
-        asyncio.run(mcp_edit(handle, pid, oid, after["occurrence"]["revision"]))
+        if edit_via == "cli":
+            cli_edit(pid, oid, after["occurrence"]["revision"])
+        else:
+            asyncio.run(mcp_edit(handle, pid, oid, after["occurrence"]["revision"]))
         stale = reference(handle, pid, oid)
         assert stale["occurrence"]["identity"]["state"] == "needs_review"
         assert "APPROVAL_STALE" in stale["occurrence"]["identity"]["reasons"]
@@ -262,7 +278,7 @@ def exercise(folder):
             json.dumps(
                 {
                     "W-18": "passed_native_cli_tty",
-                    "W-19": "passed_mcp_sdk_edit",
+                    "W-19": "passed_cli_edit" if edit_via == "cli" else "passed_mcp_sdk_edit",
                     "W-30": "passed_killed_executor_restart",
                     "approval_surface": approval["surface"],
                     "approval_revision": approval["occurrence_revision"],
@@ -275,6 +291,8 @@ def exercise(folder):
 
 
 def main():
+    edit_via = sys.argv[1] if len(sys.argv) > 1 else "mcp"
+    assert edit_via in ("mcp", "cli"), "argument must be mcp or cli"
     fixture = Offline()
     original_connect = socket.socket.connect
 
@@ -292,7 +310,7 @@ def main():
             patch.object(socket.socket, "connect", connect),
             patch.object(socket, "getaddrinfo", denied),
         ):
-            exercise(Path(temp))
+            exercise(Path(temp), edit_via)
         assert all(client._client.is_closed for client in fixture.clients)
 
 

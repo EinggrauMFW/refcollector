@@ -16,14 +16,17 @@ import typer
 from pydantic import BaseModel
 
 from refcollector.contracts.api import (
+    ArtifactDescriptor,
     CandidateView,
     GetJobOut,
     GetProjectOut,
     GetReferenceOut,
+    GetSourceOut,
     ListProjectsOut,
     ListReferencesOut,
+    ListSourcesOut,
 )
-from refcollector.domain.models import Person, WorkMetadata
+from refcollector.domain.models import Person, Preflight, SectionInfo, WorkMetadata
 
 _ANSI = re.compile(
     r"\x1b\[[0-?]*[ -/]*[@-~]"  # CSI
@@ -122,6 +125,64 @@ def job(out: GetJobOut) -> str:
     return "\n".join(lines)
 
 
+def section_line(s: SectionInfo) -> str:
+    kind = "inferred" if s.inferred else "manual" if s.manual else "detected"
+    pages = f"{s.page_start}-{s.page_end}"
+    return f"section {s.section_id}: pages {pages} (0-based)  heading {s.heading or '-'}  {kind}"
+
+
+def preflight(p: Preflight) -> str:
+    lines = [f"pages {p.pages}  text coverage {p.text_coverage:.0%}  estimated entries {p.estimated_entries}"]
+    lines += [section_line(s) for s in p.sections] or ["sections: none detected"]
+    lines += [f"warning: {w}" for w in p.warnings]
+    return "\n".join(lines)
+
+
+def source_list(out: ListSourcesOut) -> str:
+    rows = [
+        [s.source_id, s.label, s.type, s.pages, s.sections, s.extraction_state, s.occurrence_count]
+        for s in out.sources
+    ]
+    tail = f"\nnext cursor: {out.next_cursor}" if out.next_cursor else ""
+    return table(["ID", "LABEL", "TYPE", "PAGES", "SECTIONS", "EXTRACTION", "OCCURRENCES"], rows) + tail
+
+
+def source(out: GetSourceOut) -> str:
+    s = out.source
+    ex = out.extraction
+    lines = [
+        f"{s.label} ({s.source_id}) revision {out.revision}  type {s.type}",
+        preflight(out.preflight),
+        f"extraction: {ex.get('state')}  adapter: {ex.get('adapter') or '-'}"
+        f"  occurrences: {ex.get('occurrences')}",
+    ]
+    lines += [f"extraction warning {code}: {n}" for code, n in (ex.get("warnings_by_code") or {}).items()]
+    if out.sections != out.preflight.sections:
+        lines += [section_line(x) for x in out.sections]
+    lines += [f"job {j.job_id} {j.state} {','.join(j.stages)}" for j in out.jobs]
+    return "\n".join(lines)
+
+
+def artifact_list(artifacts: Sequence[ArtifactDescriptor], next_cursor: str | None = None) -> str:
+    rows = [
+        [a.artifact_id, a.kind, a.name, a.media_type, a.bytes, a.project_revision, a.sha256]
+        for a in artifacts
+    ]
+    head = table(["ID", "KIND", "NAME", "TYPE", "BYTES", "REV", "SHA256"], rows, width=64)
+    return head + (f"\nnext cursor: {next_cursor}" if next_cursor else "")
+
+
+def lineage(history: Sequence[dict[str, Any]] | None) -> list[str]:
+    """Successor/predecessor links the service records in audit payloads (split, merge)."""
+    verbs = {"created": "created", "merged": "merged from", "predecessor_ids": "predecessors"}
+    return [
+        f"  {e.get('type')}: {verb} {', '.join(map(str, ids))}"
+        for e in history or []
+        for key, verb in verbs.items()
+        if isinstance(ids := (e.get("payload") or {}).get(key), list) and ids
+    ]
+
+
 def occurrences(out: ListReferencesOut) -> str:
     rows = []
     for o in out.occurrences:
@@ -176,14 +237,16 @@ def reference(out: GetReferenceOut, *, candidate_offset: int | None = None) -> s
     lines = [
         f"{o.occurrence_id}  revision {o.revision}  label {o.label or '-'}",
         f"extraction: {o.extraction}  identity: {o.identity.state}" + (f" ({reasons})" if reasons else ""),
-        f"access: {o.access.classification or o.access.discovery}  copy: {o.local_copy}"
-        f"  retrieval: {o.retrieval}",
+        f"access: {o.access.classification or o.access.discovery}  discovery: {o.access.discovery}"
+        f"  copy: {o.local_copy}  retrieval: {o.retrieval}",
         "",
         citation_text(o.raw_text, o.edited_text),
     ]
     lines += [f"warning: {w}" for w in o.warnings]
     if out.candidates:
         lines += ["", "Candidates:", *candidate_lines(out.candidates, offset=candidate_offset)]
+    if links := lineage(out.history):
+        lines += ["", "lineage:", *links]
     for name in ("access", "local_copies", "files", "history"):
         items = getattr(out, name)
         if items:
