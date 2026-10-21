@@ -93,6 +93,20 @@ def _bibliographic_fields(text: str) -> dict[str, str]:
     return fields
 
 
+def _bibliographic_value(value: str, *, pages: bool = False) -> str:
+    value = re.sub(r"\s+", "", value).replace("–", "-").replace("—", "-")
+    if pages and (match := re.fullmatch(r"(\d+)-(\d+)", value)):
+        start, end = match.groups()
+        if len(end) < len(start):
+            # An abbreviated endpoint retains the starting page's leading digits.
+            # Carry into the next block for ranges such as 199-03 (199-203).
+            expanded = int(start[: -len(end)] + end)
+            if expanded < int(start):
+                expanded += 10 ** len(end)
+            return f"{start}-{expanded}"
+    return value
+
+
 def compare(citation: str, metadata: WorkMetadata, *, title: str | None = None) -> ScoredCandidate:
     """Score without I/O. Legacy assess stays unchanged; safety checks are additional gates.
 
@@ -158,8 +172,8 @@ def compare(citation: str, metadata: WorkMetadata, *, title: str | None = None) 
         "venue_agreement": _present(md.venue, text),
         **{
             f"{field}_agreement": (
-                re.sub(r"\s+", "", getattr(md, field)).replace("–", "-").replace("—", "-")
-                == re.sub(r"\s+", "", value).replace("–", "-").replace("—", "-")
+                _bibliographic_value(getattr(md, field), pages=field == "pages")
+                == _bibliographic_value(value, pages=field == "pages")
                 if (value := bibliographic.get(field)) and getattr(md, field)
                 else None
             )

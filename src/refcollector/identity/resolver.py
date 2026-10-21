@@ -334,8 +334,13 @@ class DefaultIdentityResolver:
             candidates = ranked()
 
         reasons = []
-        for candidate in candidates:
-            reasons.extend(candidate.reasons)
+        # Decision reasons describe the leading match and global blockers. Other
+        # candidate reasons remain with their evidence, not the chosen work.
+        if candidates:
+            reasons.extend(candidates[0].reasons)
+        for candidate in candidates[1:]:
+            if candidate.identifier_linked and not _acceptable(candidate):
+                reasons.extend(candidate.reasons)
         if failed:
             reasons.append(R.PROVIDER_UNAVAILABLE)
         accepted_index = None

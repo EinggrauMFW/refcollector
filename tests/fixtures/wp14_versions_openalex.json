@@ -1,0 +1,38 @@
+{
+  "_provenance": {
+    "source": "WP14 saved response_cache; URL hosts and paths sanitized",
+    "doi": "10.1063/1.4896850"
+  },
+  "locations": [
+    {
+      "version": "publishedVersion",
+      "is_oa": false,
+      "pdf_url": null,
+      "landing_page_url": "https://repository.example/location-0",
+      "license": null,
+      "source": {
+        "type": "journal"
+      }
+    },
+    {
+      "version": "submittedVersion",
+      "is_oa": true,
+      "pdf_url": "https://repository.example/location-1.pdf",
+      "landing_page_url": "https://repository.example/location-1",
+      "license": null,
+      "source": {
+        "type": "repository"
+      }
+    },
+    {
+      "version": "submittedVersion",
+      "is_oa": false,
+      "pdf_url": null,
+      "landing_page_url": "https://repository.example/location-2",
+      "license": null,
+      "source": {
+        "type": "repository"
+      }
+    }
+  ]
+}

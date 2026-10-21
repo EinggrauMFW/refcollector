@@ -1,0 +1,59 @@
+{
+  "citation": "Fleming AN, Macfarlane GJ. Experimental flow field comparison for a series of scale model oscillating water column wave energy converters. Mar Struct 2017;52:108\u201325.",
+  "metadata": [
+    {
+      "title": "Experimental flow field comparison for a series of scale model oscillating water column wave energy converters",
+      "authors": [
+        {
+          "family": "Fleming",
+          "given": "Alan N.",
+          "literal": null
+        },
+        {
+          "family": "Macfarlane",
+          "given": "Gregor J.",
+          "literal": null
+        }
+      ],
+      "year": 2017,
+      "venue": "Marine Structures",
+      "volume": "52",
+      "issue": null,
+      "pages": "108-125",
+      "type": "journal-article",
+      "doi": "10.1016/j.marstruc.2016.12.005"
+    },
+    {
+      "title": "A Model Predictive Control-Based Power Converter System for Oscillating Water Column Wave Energy Converters",
+      "authors": [
+        {
+          "family": "Rajapakse",
+          "given": "Gimara",
+          "literal": null
+        },
+        {
+          "family": "Jayasinghe",
+          "given": "Shantha",
+          "literal": null
+        },
+        {
+          "family": "Fleming",
+          "given": "Alan",
+          "literal": null
+        },
+        {
+          "family": "Negnevitsky",
+          "given": "Michael",
+          "literal": null
+        }
+      ],
+      "year": 2017,
+      "venue": "Energies",
+      "volume": "10",
+      "issue": "10",
+      "pages": "1631",
+      "type": "journal-article",
+      "doi": "10.3390/en10101631"
+    }
+  ]
+}

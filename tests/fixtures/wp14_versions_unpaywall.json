@@ -1,0 +1,16 @@
+{
+  "_provenance": {
+    "source": "WP14 saved response_cache; URL hosts and paths sanitized",
+    "doi": "10.1063/1.4896850"
+  },
+  "oa_locations": [
+    {
+      "host_type": "repository",
+      "license": null,
+      "url": "https://repository.example/location-0",
+      "url_for_landing_page": "https://repository.example/location-0",
+      "url_for_pdf": "https://repository.example/location-0.pdf",
+      "version": "submittedVersion"
+    }
+  ]
+}

@@ -74,7 +74,17 @@ class RetrieveHandler:
         )
         outcome = None
         warnings = []
-        if not usable:
+        locations = select_versions(
+            data["access"].locations if data["access"] else [], ctx.job.snapshot.version_policy
+        )
+        warnings.extend(str(r) for r in locations.reasons)
+        skipped = not usable and not locations.locations
+        if skipped:
+            warnings.append(
+                "Retrieval skipped: no eligible location matches version policy "
+                f"'{ctx.job.snapshot.version_policy.value}'; no download was attempted."
+            )
+        if not usable and not skipped:
             budget = ctx.job.options.get("budget", {})
             used_files, used_bytes = self.usage(ctx)
             if used_files >= budget.get("max_files", float("inf")):
@@ -89,10 +99,6 @@ class RetrieveHandler:
             limits = self.settings.limits.model_copy(
                 update={"download_bytes": min(remaining, self.settings.limits.download_bytes)}
             )
-            locations = select_versions(
-                data["access"].locations if data["access"] else [], ctx.job.snapshot.version_policy
-            )
-            warnings.extend(str(r) for r in locations.reasons)
             try:
                 async with self.providers.job(ctx.job) as (http, _resolver, _access):
                     outcome = await self.retriever_factory(staged, limits).retrieve(
@@ -106,7 +112,13 @@ class RetrieveHandler:
             except BaseException:
                 staged.cleanup()
                 raise
-        state = RetrievalState.SATISFIED_BY_LOCAL_COPY if usable else outcome.state
+        state = (
+            RetrievalState.SATISFIED_BY_LOCAL_COPY
+            if usable
+            else outcome.state
+            if outcome
+            else RetrievalState.NOT_REQUESTED
+        )
 
         def commit(store):
             try:
@@ -120,7 +132,8 @@ class RetrieveHandler:
                     if occ.identity not in ACCEPTED_IDENTITIES or occ.extraction == ExtractionState.EXCLUDED:
                         continue
                     occ.local_copy = LocalCopyState.USABLE if usable else LocalCopyState.UNUSABLE
-                    occ.retrieval = state
+                    if not skipped:
+                        occ.retrieval = state
                     if occ.approval:
                         occ.approval.occurrence_revision = occ.revision + 1
                     store.occurrences.update(occ, expected_revision=occ.revision)
@@ -130,7 +143,7 @@ class RetrieveHandler:
                     AuditEventType.FILE_RETRIEVED,
                     work.work_id,
                     state=state.value,
-                    reasons=outcome.reasons if outcome else [],
+                    reasons=outcome.reasons if outcome else warnings if skipped else [],
                     error=outcome.error if outcome else None,
                     bytes=outcome.work_file.bytes if outcome and outcome.work_file else 0,
                 )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from refcollector.config import IDENTITY_POLICY_VERSION
 from refcollector.contracts.api import (
     CreateProjectIn,
     GetCapabilitiesIn,
@@ -133,7 +134,7 @@ def test_list_and_get_project_counts(env):
     assert got.counts["by_access"] == {"not_checked": 2}
     assert got.counts["by_retrieval"] == {"not_requested": 2}
     assert got.sources_count == 1
-    assert got.policy["identity_policy_version"] == "identity-policy-v1"
+    assert got.policy["identity_policy_version"] == IDENTITY_POLICY_VERSION
     assert got.network_mode == "metadata"
     assert got.meta.project_revision == got.revision
 

@@ -20,7 +20,7 @@ APP_NAME = "refcollector"
 KEYRING_SERVICE = "refcollector"
 SECRET_NAMES = ("openalex_key", "s2_key")
 
-IDENTITY_POLICY_VERSION = "identity-policy-v1"
+IDENTITY_POLICY_VERSION = "identity-policy-v1.1"
 ELIGIBILITY_POLICY_VERSION = "eligibility-policy-v1"
 
 P0_PROVIDERS = ("crossref", "datacite", "doiorg", "openalex", "semanticscholar", "unpaywall", "openlibrary")

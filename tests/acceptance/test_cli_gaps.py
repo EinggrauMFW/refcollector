@@ -93,7 +93,9 @@ def test_w08_missing_heading_yields_inferred_section_via_source(cli):
     inferred = [s for s in preflight["sections"] if s["inferred"]]
     assert inferred and all(s["heading"] is None for s in inferred)
     assert "inferred" in c.run("source", sid)
-    c.job("run", "--source", sid, "--stages", "extract")
+    _, job = c.job("run", "--source", sid, "--stages", "extract", states=("completed_with_warnings",))
+    assert "REFERENCE_SECTION_INFERRED" in job["warnings"]
+    assert all(section["inferred"] and not section["manual"] for section in c.read("source", sid)["sections"])
     extraction = c.read("source", sid)["extraction"]
     assert extraction["state"] == "extracted" and extraction["occurrences"] == 1
 

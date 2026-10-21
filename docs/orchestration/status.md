@@ -133,3 +133,23 @@ forbidden; W-17 and W-18 use their required native surfaces. Full evidence and r
 gaps are in `acceptance.md`. No live providers, stdio clients or web environment were
 tested. No push occurred. Next work: close CLI readback gaps and remaining CLI cases,
 then complete the release/license and benchmark gates before a P0 release claim.
+
+## WP-14 confirmed corrections - 2026-10-21
+
+Continued the approved live-run investigation from `c86c3bb` in the integration
+workspace. Confirmed and corrected abbreviated page evidence (`108–25` versus
+`108-125`), decision-reason scope, empty version-selection retrieval state and
+automatic section provenance. Reviewed section handling preserves IDs referenced
+by protected occurrences. Provider version mapping was already correct; no mapping
+or version-policy relaxation was made. Identity behavior is `identity-policy-v1.1`
+(D-35), with prior identity-policy job snapshots failing closed before HTTP.
+
+Final combined gate: lint, format and 1,083 tests passed in 128.41 seconds.
+The real CLI extracted all 39 references from the retained Zheng PDF, in order,
+with automatic section provenance and unchanged section IDs. An isolated offline
+database/cache replay changed automatic acceptance from 16 to 37 of 39, leaving
+two for review, with no step errors. Four missing Semantic Scholar responses were
+modeled unavailable; this is not a live benchmark or precision measurement.
+
+Original live data remains unchanged. No new live requests, web server or push.
+Full evidence, corrected diagnoses and limits: `wp-14.md`.

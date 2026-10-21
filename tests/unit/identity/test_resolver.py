@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from refcollector.config import IDENTITY_POLICY_VERSION
 from refcollector.contracts.ports import CitationQuery
 from refcollector.domain.enums import IdentityState as State
 from refcollector.domain.enums import ReasonCode as R
@@ -79,7 +80,7 @@ def test_r02_conservative_identifiers(text, expected):
 async def test_r01_no_configured_provider_means_no_hidden_client():
     result = await DefaultIdentityResolver([]).resolve(CITATION)
     assert result.state == State.UNRESOLVED and not result.candidates
-    assert result.accepted_index is None and result.policy_version == "identity-policy-v1"
+    assert result.accepted_index is None and result.policy_version == IDENTITY_POLICY_VERSION
 
 
 @pytest.mark.anyio

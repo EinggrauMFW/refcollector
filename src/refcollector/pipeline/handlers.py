@@ -74,7 +74,17 @@ class ExtractHandler:
         def extract():
             raw = ctx.store.files.path_for(source.project_id, source.sha256).read_bytes()
             payload = raw.decode("utf-8") if source.type == SourceType.TEXT else raw
-            return self.extractor.extract(payload, source.type, source.sections or None)
+            result = self.extractor.extract(payload, source.type, source.sections or None)
+            # The adapter treats supplied ranges as manual. Stored detected ranges
+            # retain their provenance and stable IDs when the pipeline reuses them.
+            original = {section.section_id: section for section in source.sections}
+            for section in result.sections:
+                if previous := original.get(section.section_id):
+                    section.manual, section.inferred = previous.manual, previous.inferred
+            if any(section.inferred for section in result.sections):
+                if "REFERENCE_SECTION_INFERRED" not in result.warnings:
+                    result.warnings.append("REFERENCE_SECTION_INFERRED")
+            return result
 
         result = await blocking(extract)
         check_cancel(ctx)
