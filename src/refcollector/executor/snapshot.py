@@ -25,6 +25,8 @@ def build_snapshot(
         version_policy=project.version_policy,
         contact_email=settings.email,
         pdf_fallback_url=settings.pdf_fallback_url,
+        pdf_browser_python=settings.pdf_browser_python,
+        pdf_browser_binary=settings.pdf_browser_binary,
     )
 
 

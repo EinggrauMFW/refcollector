@@ -1031,6 +1031,8 @@ def config_show(as_json: AsJson = False) -> None:
         "allow_folders": [str(p) for p in s.allow_folders],
         "download_enabled_global": s.download_enabled_global,
         "pdf_fallback_url": s.pdf_fallback_url,
+        "pdf_browser_python": s.pdf_browser_python,
+        "pdf_browser_binary": s.pdf_browser_binary,
         "enabled_providers": s.enabled_providers,
         "mcp_scopes": sorted(x.value for x in s.mcp_scopes),
         "keys": keys,
@@ -1041,6 +1043,8 @@ def config_show(as_json: AsJson = False) -> None:
     echo(f"rc_home: {data['rc_home']}")
     echo(f"email: {s.email or '(not set)'}")
     echo(f"PDF fallback: {s.pdf_fallback_url or 'disabled'}")
+    echo(f"PDF browser Python: {s.pdf_browser_python or 'disabled'}")
+    echo(f"PDF browser binary: {s.pdf_browser_binary or 'disabled'}")
     echo("allowed folders: " + (", ".join(data["allow_folders"]) or "(none)"))
     echo("providers: " + ", ".join(s.enabled_providers))
     echo(
@@ -1048,13 +1052,45 @@ def config_show(as_json: AsJson = False) -> None:
     )
 
 
+@config_app.command("pdf-browser")
+@guard
+def config_pdf_browser(
+    python_path: str,
+    binary: Annotated[Path | None, typer.Option("--binary")] = None,
+) -> None:
+    """Set external browser Python and Chromium paths, or select off."""
+    if python_path == "off":
+        python_value = binary_value = None
+    else:
+        if binary is None:
+            raise typer.BadParameter("--binary is required when enabling the PDF browser")
+        python_file = Path(python_path).expanduser().resolve()
+        binary_file = binary.expanduser().resolve()
+        if not python_file.is_file():
+            raise typer.BadParameter("Python path must be an existing file")
+        if not binary_file.is_file():
+            raise typer.BadParameter("Chromium path must be an existing file")
+        python_value, binary_value = str(python_file), str(binary_file)
+    settings = load_settings()
+    settings.pdf_browser_python = python_value
+    settings.pdf_browser_binary = binary_value
+    save_settings(settings)
+    echo(f"PDF browser: {python_value or 'disabled'}")
+
+
 @config_app.command("pdf-fallback")
 @guard
 def config_pdf_fallback(url_template: str) -> None:
-    """Set a trusted local DOI PDF fallback URL template, or use off to disable it."""
+    """Select box, su, st, ru, a custom HTTPS DOI template, or off."""
     from refcollector.files.pdf_fallback import validate_template
 
-    value = None if url_template == "off" else validate_template(url_template)
+    presets = {name: f"https://sci-hub.{name}/{{doi}}" for name in ("box", "su", "st", "ru")}
+    selected = presets.get(url_template, url_template)
+    for template in presets.values():
+        if selected.rstrip("/") == template.removesuffix("/{doi}"):
+            selected = template
+            break
+    value = None if selected == "off" else validate_template(selected)
     s = load_settings()
     s.pdf_fallback_url = value
     save_settings(s)

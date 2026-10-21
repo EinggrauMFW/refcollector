@@ -47,3 +47,14 @@ def test_show_includes_enabled_url_and_disabled_state(cli: Cli, monkeypatch: pyt
     assert cli.run("config", "pdf-fallback", URL).exit_code == 0
     assert json.loads(cli.run("config", "show", "--json").output)["pdf_fallback_url"] == URL
     assert URL in cli.run("config", "show").output
+
+
+@pytest.mark.parametrize("domain", ["box", "su", "st", "ru"])
+def test_preset_and_base_url_store_doi_template(cli: Cli, rc_home: Path, domain: str) -> None:
+    expected = f"https://sci-hub.{domain}/{{doi}}"
+    for value in (domain, f"https://sci-hub.{domain}/"):
+        result = cli.run("config", "pdf-fallback", value)
+        assert result.exit_code == 0, result.output
+        assert load_settings(rc_home).pdf_fallback_url == expected
+    assert cli.app.started == 0
+    assert cli.svc.calls == []

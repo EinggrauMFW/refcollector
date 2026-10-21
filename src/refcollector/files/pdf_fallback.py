@@ -49,6 +49,10 @@ class _PdfParser(HTMLParser):
         values = dict(attrs)
         if self.url is None and tag in {"iframe", "embed", "object"} and values.get("id") == "pdf":
             self.url = values.get("src") or (values.get("data") if tag == "object" else None)
+        if self.url is None and tag == "a":
+            href = values.get("href") or ""
+            if urlsplit(href).path.startswith("/storage/") and urlsplit(href).path.endswith(".pdf"):
+                self.url = href
 
 
 class DoiPdfFallback:

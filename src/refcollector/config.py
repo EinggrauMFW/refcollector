@@ -67,6 +67,8 @@ class Settings(BaseModel):
     enabled_providers: list[str] = Field(default_factory=lambda: list(P0_PROVIDERS))
     limits: Limits = Field(default_factory=Limits)
     pdf_fallback_url: str | None = None
+    pdf_browser_python: str | None = None
+    pdf_browser_binary: str | None = None
 
     # ---- paths ----
     @property

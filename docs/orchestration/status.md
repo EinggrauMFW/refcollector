@@ -167,3 +167,34 @@ Final gate: `uv run python scripts/check.py` passed lint, format (187 files), an
 1,132 tests in 147.29 seconds. The 49 new cases include real CLI and MCP SDK
 flows with external HTTP replaced. No live Sci-Hub request or dev server was used.
 Usage and boundaries: [pdf-fallback.md](pdf-fallback.md). Decision: D-36.
+
+## Browser-assisted DOI fallback (2026-10-21)
+
+Integrated optional SeleniumBase 4.56.2 CDP link resolution after normal/static
+retrieval failure, including one inspected ALTCHA checkbox interaction, storage
+links and a scoped browser User-Agent for the final pinned PDF request. Trusted
+local Python/Chromium paths are frozen in jobs; default disabled. Core runtime
+has no SeleniumBase dependency. Project grants, any_eligible, existing review
+PDFs, identity verification and atomic publication stay enforced.
+
+Independent review found and resolved typed launch failures and descendant
+cleanup defects. Windows uses an actual-interpreter handshake and kill-on-close
+Job Object. Native Chrome membership and termination after worker failure passed
+with standalone CPython 3.13.15 and its isolated environment. Microsoft Store
+Python launched Chrome outside containment; browser workers reject it before
+Chromium starts. The core CLI still runs on its existing Python.
+
+Combined gate: `uv run python scripts/check.py` passed lint, format (196 files)
+and 1,179 tests in 148.26 seconds. No further product code changed after this gate.
+CLI/MCP offline workflows remain covered; browser process, proxy, header scope,
+config snapshots and pipeline failure/identity cases have focused regressions.
+
+Live evidence is bounded: the initial real CLI saved and verified the Breyer IEEE
+Access paper (43 pages, 2,091,680 bytes), SHA-256
+`9afe5c60ef6e88ceb62e1b4b36f6fcda19d20d49ade38eb48e4c25a55e203108`.
+The final standalone-runtime smoke reached the article, but st and su advertised
+an unusable `/storage/zero/...` PDF URL; downloads failed validation. Additional
+raw/uppercase DOI diagnostics did not correct that external response. No storage
+path was guessed and no failed file was marked verified. This is not proof of
+reliable downloads from every mirror or every bot challenge. No web server was
+needed. Usage and limits: [pdf-fallback.md](pdf-fallback.md), decision D-37.

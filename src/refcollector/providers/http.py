@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -100,6 +102,7 @@ class ProviderHttpClient:
         if snapshot.contact_email:
             ua += f" (mailto:{snapshot.contact_email})"
         self._user_agent = ua
+        self._browser_profile = ContextVar("browser_pdf_profile", default=None)
         self._client = httpx.AsyncClient(
             transport=transport, headers={"User-Agent": ua}, timeout=30.0, follow_redirects=True
         )
@@ -169,6 +172,23 @@ class ProviderHttpClient:
 
     # ------------------------------------------------------------------ retrieval
 
+    @contextmanager
+    def browser_pdf_profile(self, url: str, user_agent: str):
+        """Use the resolving browser's public User-Agent for one PDF operation only."""
+        validate_destination(url)
+        if (
+            not isinstance(user_agent, str)
+            or not user_agent
+            or len(user_agent) > 512
+            or any(not 32 <= ord(c) < 127 for c in user_agent)
+        ):
+            raise IntegrationUnavailable("Browser User-Agent is invalid")
+        token = self._browser_profile.set((url, user_agent))
+        try:
+            yield
+        finally:
+            self._browser_profile.reset(token)
+
     async def download(
         self,
         url: str,
@@ -191,7 +211,13 @@ class ProviderHttpClient:
                 async with httpx.AsyncClient(
                     transport=transport,
                     trust_env=False,
-                    headers={"User-Agent": self._user_agent},
+                    headers={
+                        "User-Agent": (
+                            self._browser_profile.get()[1]
+                            if self._browser_profile.get() and self._browser_profile.get()[0] == url
+                            else self._user_agent
+                        )
+                    },
                     follow_redirects=False,
                 ) as client:
                     return await self._download(

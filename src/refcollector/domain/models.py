@@ -121,6 +121,8 @@ class ConfigSnapshot(Model):
     version_policy: VersionPolicy
     contact_email: str | None = None
     pdf_fallback_url: str | None = None
+    pdf_browser_python: str | None = None
+    pdf_browser_binary: str | None = None
 
 
 # ---------- project-scoped entities ----------

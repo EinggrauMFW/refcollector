@@ -1,5 +1,7 @@
 """Local-copy-first retrieval with transactional publication and bounded budgets."""
 
+from contextlib import nullcontext
+
 from refcollector.access.versions import select_versions
 from refcollector.contracts.ports import RetrievalOutcome, StepResult
 from refcollector.domain.enums import (
@@ -14,6 +16,7 @@ from refcollector.domain.enums import (
     VersionPolicy,
 )
 from refcollector.errors import BudgetExceeded, Cancelled, RcError, TransientNetworkError
+from refcollector.files.browser_fallback import BrowserPdfFallback
 from refcollector.files.local_copies import DefaultLocalCopyChecker
 from refcollector.files.pdf_fallback import DoiPdfFallback
 from refcollector.files.retrieval import DefaultRetriever, effective_metadata
@@ -33,6 +36,7 @@ class RetrieveHandler:
             files, limits=limits, verifier=NativeVerifier(DefaultFileVerifier(limits))
         )
         self.fallback_factory = lambda files, limits: DoiPdfFallback(files, limits=limits)
+        self.browser_factory = BrowserPdfFallback
 
     async def run(self, ctx):
         staged = StagedFiles(ctx.store.files)
@@ -95,7 +99,8 @@ class RetrieveHandler:
             and not stored_pdf
             and ctx.job.snapshot.version_policy == VersionPolicy.ANY_ELIGIBLE
         )
-        fallback_attempted, primary_error = False, None
+        fallback_attempted, browser_attempted, primary_error = False, False, None
+        fallback_pdf_url, browser_agent = None, None
         if not usable and (locations.locations or fallback_allowed):
             budget = ctx.job.options.get("budget", {})
             used_files, used_bytes = self.usage(ctx)
@@ -133,6 +138,7 @@ class RetrieveHandler:
                             )
                             check_cancel(ctx)
                             if location:
+                                fallback_pdf_url = location.url
                                 outcome = await retriever.retrieve(
                                     ctx.job.project_id,
                                     work,
@@ -140,7 +146,36 @@ class RetrieveHandler:
                                     http=http,
                                     is_cancelled=ctx.is_cancelled,
                                 )
-                            else:
+                            if ctx.job.snapshot.pdf_browser_python and (
+                                outcome is None or outcome.work_file is None
+                            ):
+                                browser_attempted = True
+                                browser = self.browser_factory(
+                                    python=ctx.job.snapshot.pdf_browser_python,
+                                    binary=ctx.job.snapshot.pdf_browser_binary or "",
+                                    limits=limits,
+                                )
+                                location = await browser.resolve(
+                                    fallback_url, doi, is_cancelled=ctx.is_cancelled
+                                )
+                                browser_agent = getattr(browser, "user_agent", None)
+                                check_cancel(ctx)
+                                if location:
+                                    fallback_pdf_url = location.url
+                                    profile = (
+                                        http.browser_pdf_profile(location.url, browser_agent)
+                                        if browser_agent
+                                        else nullcontext()
+                                    )
+                                    with profile:
+                                        outcome = await retriever.retrieve(
+                                            ctx.job.project_id,
+                                            work,
+                                            [location],
+                                            http=http,
+                                            is_cancelled=ctx.is_cancelled,
+                                        )
+                            if location is None:
                                 warnings.append("Configured PDF fallback returned no PDF link.")
                         except Cancelled:
                             raise
@@ -209,6 +244,8 @@ class RetrieveHandler:
                     error=outcome.error if outcome else None,
                     bytes=outcome.work_file.bytes if outcome and outcome.work_file else 0,
                     fallback_attempted=fallback_attempted,
+                    browser_attempted=browser_attempted,
+                    fallback_pdf_url=fallback_pdf_url,
                     fallback_resolver=fallback_url if fallback_attempted else None,
                     primary_error=primary_error,
                 )
