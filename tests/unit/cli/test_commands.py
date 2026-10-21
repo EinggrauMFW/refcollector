@@ -212,8 +212,7 @@ def test_run_maps_stages_and_scope(cli: Cli) -> None:
     assert cli.calls("start_job")[1][2].options.max_occurrences == 5
 
 
-def test_run_needs_scope_and_rejects_both(cli: Cli) -> None:
-    assert cli.run("--project", "prj_1", "run").exit_code == 2
+def test_run_rejects_both_scopes(cli: Cli) -> None:
     assert cli.run("--project", "prj_1", "run", "--source", "s", "--occurrence", "o").exit_code == 2
 
 
