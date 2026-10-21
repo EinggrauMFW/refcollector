@@ -13,6 +13,7 @@ import asyncio
 import functools
 import getpass
 import inspect
+import io
 import json
 import os
 import re
@@ -157,6 +158,13 @@ def svc() -> RefCollectorService:
     return get_app().service
 
 
+def _utf8_streams() -> None:
+    """Write UTF-8 even when piped on Windows, where the default is the ANSI code page."""
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
 @app.callback()
 def _root(
     ctx: typer.Context,
@@ -166,6 +174,7 @@ def _root(
     ] = None,
 ) -> None:
     """RefCollector command line."""
+    _utf8_streams()
     _state.project = project
     _state.resolved = {}
     ctx.call_on_close(_close_app)
@@ -399,8 +408,11 @@ Cursor = Annotated[str | None, typer.Option("--cursor", help="Continue after thi
 @guard
 def sources(limit: Limit = None, cursor: Cursor = None, as_json: AsJson = False) -> None:
     """List sources. Without --limit/--cursor, pages through all of them."""
-    pid = project_id()
-    one_page = limit is not None or cursor is not None
+    out = _list_sources(project_id(), limit, cursor, one_page=limit is not None or cursor is not None)
+    render.dump_json(out) if as_json else echo(render.source_list(out))
+
+
+def _list_sources(pid: str, limit: int | None, cursor: str | None, *, one_page: bool) -> ListSourcesOut:
     items = []
     while True:
         out = svc().list_sources(new_ctx(), ListSourcesIn(project_id=pid, cursor=cursor, limit=limit))
@@ -408,8 +420,7 @@ def sources(limit: Limit = None, cursor: Cursor = None, as_json: AsJson = False)
         cursor = out.next_cursor
         if one_page or not cursor:
             break
-    out = ListSourcesOut(sources=items, next_cursor=cursor)
-    render.dump_json(out) if as_json else echo(render.source_list(out))
+    return ListSourcesOut(sources=items, next_cursor=cursor)
 
 
 @app.command("source")
@@ -485,12 +496,16 @@ def run(
     wait: Wait = False,
     idempotency_key: Idem = None,
 ) -> None:
-    """Start a job over sources or occurrences."""
-    if bool(source) == bool(occurrence):
-        raise typer.BadParameter("give --source or --occurrence (not both)")
+    """Start a job over sources or occurrences. Without either, use every source of the project."""
+    if source and occurrence:
+        raise typer.BadParameter("give --source or --occurrence, not both")
     from refcollector.contracts.api import StartJobIn
 
     pid = project_id()
+    if not source and not occurrence:
+        source = [s.source_id for s in _list_sources(pid, None, None, one_page=False).sources]
+        if not source:
+            raise typer.BadParameter("the project has no sources; run `refcollector import` first")
     req = StartJobIn.model_validate(
         {
             "project_id": pid,

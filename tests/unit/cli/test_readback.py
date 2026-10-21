@@ -13,6 +13,7 @@ from refcollector.contracts.api import (
     ListArtifactsOut,
     ListSourcesOut,
     ReadArtifactOut,
+    StartJobOut,
 )
 from refcollector.domain.models import Preflight, SectionInfo
 from refcollector.errors import NotFound
@@ -73,6 +74,42 @@ def test_sources_pages_to_exhaustion(cli: Cli) -> None:
     assert len(cli.calls("list_sources")) == 2
     data = json.loads(cli.run(*P, "sources", "--json").output)
     assert [s["source_id"] for s in data["sources"]] == ["src_1", "src_2"] and data["next_cursor"] is None
+
+
+def test_run_without_scope_uses_every_source(cli: Cli) -> None:
+    """Spec 4: `refcollector run --stages extract` needs no source IDs."""
+    pages = {
+        None: ListSourcesOut(sources=[item(1)], next_cursor="c1"),
+        "c1": ListSourcesOut(sources=[item(2)], next_cursor=None),
+    }
+    cli.svc.responses["list_sources"] = lambda _c, req: pages[req.cursor]
+    cli.svc.responses["start_job"] = StartJobOut(job_id="job_1", steps_planned=2, next_poll_after_ms=10)
+    r = cli.run(*P, "run", "--stages", "extract")
+    assert r.exit_code == 0, r.output
+    assert cli.calls("start_job")[0][2].scope.source_ids == ["src_1", "src_2"]
+
+
+def test_run_without_scope_and_no_sources_is_usage_error(cli: Cli) -> None:
+    cli.svc.responses["list_sources"] = ListSourcesOut(sources=[], next_cursor=None)
+    r = cli.run(*P, "run", "--stages", "extract")
+    assert r.exit_code == 2 and "import" in r.output
+    assert cli.calls("start_job") == []
+
+
+def test_piped_output_is_utf8(monkeypatch: Any) -> None:
+    """Windows pipes default to the ANSI code page; the CLI must write UTF-8."""
+    import io
+    import sys
+
+    from refcollector.cli import main
+
+    raw = io.BytesIO()
+    stream = io.TextIOWrapper(raw, encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", stream)
+    main._utf8_streams()
+    stream.write("Sepúlveda … Daftar Pustaka")
+    stream.flush()
+    assert raw.getvalue().decode("utf-8") == "Sepúlveda … Daftar Pustaka"
 
 
 def test_sources_limit_is_one_page(cli: Cli) -> None:
