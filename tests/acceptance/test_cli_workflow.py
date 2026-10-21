@@ -44,11 +44,11 @@ class Commands:
     def import_text(self, text=TEXT):
         return re.search(r"src_[A-Z0-9]+", self.run("import", "--text", text))[0]
 
-    def job(self, *args):
+    def job(self, *args, states=("completed",)):
         output = self.run(*args, "--wait")
         jid = re.search(r"job (job_[A-Z0-9]+)", output)[1]
         result = self.read("jobs", jid)
-        assert result["state"] == "completed", result
+        assert result["state"] in states, result
         return jid, result
 
     def rows(self, *args):

@@ -237,8 +237,8 @@ def reference(out: GetReferenceOut, *, candidate_offset: int | None = None) -> s
     lines = [
         f"{o.occurrence_id}  revision {o.revision}  label {o.label or '-'}",
         f"extraction: {o.extraction}  identity: {o.identity.state}" + (f" ({reasons})" if reasons else ""),
-        f"access: {o.access.classification or o.access.discovery}  copy: {o.local_copy}"
-        f"  retrieval: {o.retrieval}",
+        f"access: {o.access.classification or o.access.discovery}  discovery: {o.access.discovery}"
+        f"  copy: {o.local_copy}  retrieval: {o.retrieval}",
         "",
         citation_text(o.raw_text, o.edited_text),
     ]
