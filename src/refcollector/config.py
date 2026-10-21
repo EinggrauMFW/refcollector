@@ -66,6 +66,7 @@ class Settings(BaseModel):
     download_enabled_global: bool = False
     enabled_providers: list[str] = Field(default_factory=lambda: list(P0_PROVIDERS))
     limits: Limits = Field(default_factory=Limits)
+    pdf_fallback_url: str | None = None
 
     # ---- paths ----
     @property

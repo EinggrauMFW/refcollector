@@ -262,6 +262,7 @@ class CopyVersion(StrEnum):
 
 
 class LocationBasis(StrEnum):
+    CONFIGURED_FALLBACK = "configured_fallback"
     OA_PROVIDER = "oa_provider"
     REPOSITORY = "repository"
     USER_APPROVED = "user_approved"

@@ -1030,6 +1030,7 @@ def config_show(as_json: AsJson = False) -> None:
         "email": s.email,
         "allow_folders": [str(p) for p in s.allow_folders],
         "download_enabled_global": s.download_enabled_global,
+        "pdf_fallback_url": s.pdf_fallback_url,
         "enabled_providers": s.enabled_providers,
         "mcp_scopes": sorted(x.value for x in s.mcp_scopes),
         "keys": keys,
@@ -1039,11 +1040,25 @@ def config_show(as_json: AsJson = False) -> None:
         return
     echo(f"rc_home: {data['rc_home']}")
     echo(f"email: {s.email or '(not set)'}")
+    echo(f"PDF fallback: {s.pdf_fallback_url or 'disabled'}")
     echo("allowed folders: " + (", ".join(data["allow_folders"]) or "(none)"))
     echo("providers: " + ", ".join(s.enabled_providers))
     echo(
         "keys: " + (", ".join(f"{k}={'set' if v else 'missing'}" for k, v in keys.items()) or "(unavailable)")
     )
+
+
+@config_app.command("pdf-fallback")
+@guard
+def config_pdf_fallback(url_template: str) -> None:
+    """Set a trusted local DOI PDF fallback URL template, or use off to disable it."""
+    from refcollector.files.pdf_fallback import validate_template
+
+    value = None if url_template == "off" else validate_template(url_template)
+    s = load_settings()
+    s.pdf_fallback_url = value
+    save_settings(s)
+    echo(f"PDF fallback: {value or 'disabled'}")
 
 
 @config_app.command("set")

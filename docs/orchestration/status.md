@@ -153,3 +153,17 @@ modeled unavailable; this is not a live benchmark or precision measurement.
 
 Original live data remains unchanged. No new live requests, web server or push.
 Full evidence, corrected diagnoses and limits: `wp-14.md`.
+
+## Optional DOI HTML fallback (2026-10-21)
+
+Added the user-requested Sci-Hub-style static PDF resolver, disabled by default.
+Trusted local configuration is frozen into jobs; MCP cannot enable it. Local
+copies and normal sources remain first. Unknown version requires `any_eligible`.
+Existing review PDFs, project grants, secured transport, budgets, cancellation
+and identity verification remain enforced. Independent review found and resolved
+the stored-review-PDF retry defect with a regression test.
+
+Final gate: `uv run python scripts/check.py` passed lint, format (187 files), and
+1,132 tests in 147.29 seconds. The 49 new cases include real CLI and MCP SDK
+flows with external HTTP replaced. No live Sci-Hub request or dev server was used.
+Usage and boundaries: [pdf-fallback.md](pdf-fallback.md). Decision: D-36.

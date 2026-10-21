@@ -3,6 +3,8 @@
 > The v0.1 code lives in `legacy/` and runs as before from there. A rewrite to the P0 spec
 > (`docs/spec/refcollector-spec-v3.md`) is in progress in `src/refcollector/`.
 
+The P0 CLI also supports an explicitly configured [DOI PDF fallback](docs/orchestration/pdf-fallback.md), disabled by default. The legacy app instructions below do not enable it.
+
 Give it a thesis or paper as a PDF. It finds the reference list, looks up full metadata for every
 entry, downloads the open-access PDFs it can find, and lists the paywalled ones with a drafted
 email you can send to the authors.
@@ -71,7 +73,7 @@ python legacy/tests/batch_resolve.py  <folder-of-pdfs> you@example.com 60   # re
 ## Limitations
 
 - **Open access only.** Paywalled papers are not downloaded; they are listed with a drafted request
-  email. Sources such as Sci-Hub are deliberately not supported.
+  email. This legacy limitation also describes default P0 retrieval; P0 has a separate opt-in DOI fallback.
 - **Grey literature** (technical reports, standards, theses, government documents) mostly has no DOI
   in any database. Those entries stay as *web source* (if they have a URL) or *unresolved*.
 - **Extraction depends on the PDF layout.** Two-column PDFs, unusual heading names, or one reference

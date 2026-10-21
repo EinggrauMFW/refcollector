@@ -120,6 +120,7 @@ class ConfigSnapshot(Model):
     adapter_versions: dict[str, str]
     version_policy: VersionPolicy
     contact_email: str | None = None
+    pdf_fallback_url: str | None = None
 
 
 # ---------- project-scoped entities ----------

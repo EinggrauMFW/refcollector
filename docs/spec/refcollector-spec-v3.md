@@ -26,7 +26,7 @@ RefCollector turns a document's bibliography into a checked, traceable reference
 4. Record where every decision came from (automation, agent, or an interactive approval surface) and never let a tool argument or a connection identity stand in for a recorded user approval (section 7.4).
 5. Keep identity, access discovery, access classification, local copies and retrieval as separate questions (sections 7.3, 10).
 6. The P0 workflow needs no LLM, no account, no Docker and no Zotero.
-7. Legal access only. No shadow libraries, no paywall circumvention, no sending of messages.
+7. Default retrieval uses open-access or explicitly approved locations. A trusted local operator can configure the optional DOI HTML fallback (10.4, D-36). No sending of messages.
 8. Never invent identifiers, metadata, contacts or licences.
 9. One engine: every interface calls the same application services and the same executor (section 6).
 
@@ -51,7 +51,7 @@ RefCollector turns a document's bibliography into a checked, traceable reference
 | G11 | Inputs are PDF only; no retraction check | Agents holding identifiers cannot start; retracted works pass silently | 3 |
 | G12 | The repository has no licence file. GitHub's terms let other users view and fork a public repository on GitHub, but reproduction, distribution and derivative works are not licensed | Third parties cannot lawfully reuse or redistribute the code outside those platform rights | 14.3 |
 
-Retain: `assess()` field comparison and flags, `mailto` User-Agent, `Retry-After` handling, per-host blocking after a long rate-limit wait, the `%PDF` check (as one step of 10.4), manual DOI override, no-Sci-Hub policy.
+Retain: `assess()` field comparison and flags, `mailto` User-Agent, `Retry-After` handling, per-host blocking after a long rate-limit wait, the `%PDF` check (as one step of 10.4), manual DOI override, optional DOI HTML fallback disabled by default (D-36).
 
 ---
 
@@ -402,6 +402,8 @@ Before retrieval, the executor evaluates local copies for the work:
 A file failing 2–3 is rejected (`FILE_VALIDATION_FAILED`). A file failing 4–6 is kept as `needs_review` with its reason, never `verified`. File names in exports use the template `{year}_{first_author}_{short_title}.pdf`.
 
 ---
+
+Optional DOI HTML fallback (D-36): a trusted local CLI setting supplies an HTTPS URL template containing one `{doi}` path placeholder. This explicitly supersedes the previous no-Sci-Hub scope rule when configured. Local copies and normal sources run first. Only `any_eligible` permits this fallback because its version is unknown. An existing stored PDF, including `needs_review`, prevents another automatic fallback. The resolver reads a static `#pdf` link from bounded HTML and passes the resulting URL through the same destination, download, identity and storage checks. It records `configured_fallback`; it does not establish OA status, a licence, or user approval. Project retrieval mode and download grants remain required. Jobs freeze the setting; MCP cannot enable it. Scripts and CAPTCHA challenges are not executed.
 
 ## 11. MCP specification
 

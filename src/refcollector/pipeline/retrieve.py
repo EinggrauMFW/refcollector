@@ -1,7 +1,7 @@
 """Local-copy-first retrieval with transactional publication and bounded budgets."""
 
 from refcollector.access.versions import select_versions
-from refcollector.contracts.ports import StepResult
+from refcollector.contracts.ports import RetrievalOutcome, StepResult
 from refcollector.domain.enums import (
     ACCEPTED_IDENTITIES,
     AuditEventType,
@@ -11,10 +11,12 @@ from refcollector.domain.enums import (
     LocalCopyState,
     RetrievalState,
     StepType,
+    VersionPolicy,
 )
-from refcollector.errors import BudgetExceeded
+from refcollector.errors import BudgetExceeded, Cancelled, RcError, TransientNetworkError
 from refcollector.files.local_copies import DefaultLocalCopyChecker
-from refcollector.files.retrieval import DefaultRetriever
+from refcollector.files.pdf_fallback import DoiPdfFallback
+from refcollector.files.retrieval import DefaultRetriever, effective_metadata
 from refcollector.files.verify import DefaultFileVerifier
 from refcollector.pipeline.files import StagedFiles
 from refcollector.pipeline.native import NativeVerifier
@@ -30,6 +32,7 @@ class RetrieveHandler:
         self.retriever_factory = lambda files, limits: DefaultRetriever(
             files, limits=limits, verifier=NativeVerifier(DefaultFileVerifier(limits))
         )
+        self.fallback_factory = lambda files, limits: DoiPdfFallback(files, limits=limits)
 
     async def run(self, ctx):
         staged = StagedFiles(ctx.store.files)
@@ -78,13 +81,22 @@ class RetrieveHandler:
             data["access"].locations if data["access"] else [], ctx.job.snapshot.version_policy
         )
         warnings.extend(str(r) for r in locations.reasons)
-        skipped = not usable and not locations.locations
-        if skipped:
-            warnings.append(
-                "Retrieval skipped: no eligible location matches version policy "
-                f"'{ctx.job.snapshot.version_policy.value}'; no download was attempted."
-            )
-        if not usable and not skipped:
+        fallback_url = ctx.job.snapshot.pdf_fallback_url
+        doi = effective_metadata(work).doi
+        stored_pdf = any(
+            file.state in {RetrievalState.VERIFIED, RetrievalState.NEEDS_REVIEW}
+            and ctx.store.files.has_grant(ctx.job.project_id, file.sha256)
+            and ctx.store.files.path_for(ctx.job.project_id, file.sha256).is_file()
+            for file in data["files"]
+        )
+        fallback_allowed = bool(
+            fallback_url
+            and doi
+            and not stored_pdf
+            and ctx.job.snapshot.version_policy == VersionPolicy.ANY_ELIGIBLE
+        )
+        fallback_attempted, primary_error = False, None
+        if not usable and (locations.locations or fallback_allowed):
             budget = ctx.job.options.get("budget", {})
             used_files, used_bytes = self.usage(ctx)
             if used_files >= budget.get("max_files", float("inf")):
@@ -101,17 +113,67 @@ class RetrieveHandler:
             )
             try:
                 async with self.providers.job(ctx.job) as (http, _resolver, _access):
-                    outcome = await self.retriever_factory(staged, limits).retrieve(
-                        ctx.job.project_id,
-                        work,
-                        locations.locations,
-                        http=http,
-                        is_cancelled=ctx.is_cancelled,
-                    )
+                    retriever = self.retriever_factory(staged, limits)
+                    if locations.locations:
+                        outcome = await retriever.retrieve(
+                            ctx.job.project_id,
+                            work,
+                            locations.locations,
+                            http=http,
+                            is_cancelled=ctx.is_cancelled,
+                        )
+                    check_cancel(ctx)
+                    # A saved review PDF is retained; fallback never replaces it silently.
+                    if fallback_allowed and (outcome is None or outcome.work_file is None):
+                        fallback_attempted = True
+                        primary_error = outcome.error if outcome else None
+                        try:
+                            location = await self.fallback_factory(staged, limits).resolve(
+                                fallback_url, doi, http=http, is_cancelled=ctx.is_cancelled
+                            )
+                            check_cancel(ctx)
+                            if location:
+                                outcome = await retriever.retrieve(
+                                    ctx.job.project_id,
+                                    work,
+                                    [location],
+                                    http=http,
+                                    is_cancelled=ctx.is_cancelled,
+                                )
+                            else:
+                                warnings.append("Configured PDF fallback returned no PDF link.")
+                        except Cancelled:
+                            raise
+                        except TimeoutError:
+                            error = TransientNetworkError("Configured PDF fallback timed out")
+                            outcome = RetrievalOutcome(RetrievalState.FAILED, None, [], error.to_payload())
+                        except RcError as error:
+                            # Cancellation must still discard the complete staged result.
+                            check_cancel(ctx)
+                            outcome = RetrievalOutcome(RetrievalState.FAILED, None, [], error.to_payload())
                 check_cancel(ctx)
             except BaseException:
                 staged.cleanup()
                 raise
+        skipped = not usable and outcome is None
+        if (
+            not usable
+            and fallback_url
+            and not fallback_attempted
+            and (outcome is None or not outcome.work_file)
+        ):
+            if stored_pdf:
+                warnings.append("Configured PDF fallback skipped: an existing stored PDF requires review.")
+            else:
+                warnings.append(
+                    "Configured PDF fallback needs an accepted DOI and explicit any_eligible version policy; "
+                    "its copy version is unknown."
+                )
+        if skipped and not fallback_attempted:
+            warnings.append(
+                "Retrieval skipped: no eligible location matches version policy "
+                f"'{ctx.job.snapshot.version_policy.value}'; no download was attempted."
+            )
         state = (
             RetrievalState.SATISFIED_BY_LOCAL_COPY
             if usable
@@ -146,6 +208,9 @@ class RetrieveHandler:
                     reasons=outcome.reasons if outcome else warnings if skipped else [],
                     error=outcome.error if outcome else None,
                     bytes=outcome.work_file.bytes if outcome and outcome.work_file else 0,
+                    fallback_attempted=fallback_attempted,
+                    fallback_resolver=fallback_url if fallback_attempted else None,
+                    primary_error=primary_error,
                 )
                 return outcome.work_file.work_file_id if outcome and outcome.work_file else work.work_id
             finally:

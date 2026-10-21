@@ -24,6 +24,7 @@ def build_snapshot(
         adapter_versions=dict(adapter_versions or {}),
         version_policy=project.version_policy,
         contact_email=settings.email,
+        pdf_fallback_url=settings.pdf_fallback_url,
     )
 
 
