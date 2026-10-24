@@ -319,3 +319,9 @@ Two Sonnet 5.5 subagents in parallel. Advanced: Library tokens, 224 px sidebar, 
 - Gemini reports72frontend tests,lint/typecheck,4Node client tests and clean wheel CLI installation passing. Root independently inspected built archives for migration/static assets/licenses and excluded local directories.
 - Publication review found no real credentials; root removed two local filesystem references and marked benchmark evidence as local/not distributed. Local .ai/.taste-skill/jean.json/build outputs/PDFs remain excluded from Git.
 - User authorization supersedes earlier no-commit/no-push instructions for this beta. Publish normal fast-forward main plus v0.2.0b1 prerelease; no PyPI publication.
+
+### README screenshots and architecture diagrams published
+- Added real Selenium screenshots of the running beta Library and Advanced References views, using a new illustrative demo collection. Images are in docs/images/ and embedded near the top of README.
+- Added source-checked Mermaid diagrams for stdio MCP integration and the loopback web/PDF workflow. Both parsed and rendered successfully with Mermaid11. Image relative paths and git diff whitespace checks passed.
+- Clarified MCP human-approval limits and rejection of malformed/unsafe PDFs. Captions describe actual illustrative data; no copyrighted PDF page images were published.
+- README/image commit1428d10 pushed to main; root verified remote commit and screenshot HTTP200. Application code unchanged; application tests skipped for this documentation-only update.
