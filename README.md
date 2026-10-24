@@ -80,6 +80,10 @@ truncation warnings before relying on a reconstructed bibliography.
 
 For pasted references, use `import --text "REFERENCE TEXT"` instead of a PDF path.
 For extraction without provider requests, run with `--stages extract --wait`.
+To avoid typing `--project` each time, set the `RC_PROJECT` environment variable.
+
+Every command and option, and a table of error codes with fixes, are in the
+[CLI reference](docs/CLI.md).
 
 ## Review uncertain matches
 
@@ -229,6 +233,35 @@ repository and data paths with absolute paths on your computer:
 }
 ```
 
+The server offers 22 tools. Each tool needs one scope. Every tool that changes data
+needs an `idempotency_key`.
+
+| Tool | Scope | Purpose |
+|---|---|---|
+| `get_capabilities` | none | Server version, providers, limits, granted scopes, key presence. |
+| `list_projects`, `get_project` | `projects:read` | List projects; read one project with its recent jobs. |
+| `create_project` | `projects:write` | Create a project. |
+| `import_source` | `sources:import` | Import a PDF from an allowed folder, or pasted text. |
+| `list_sources`, `get_source` | `references:read` | List sources; read preflight, sections and warnings. |
+| `set_source_sections` | `references:write` | Set the bibliography page ranges of a source. |
+| `start_job` | per stage | Start extract, resolve or discover_access. Each stage needs its own scope: `references:write`, `metadata:resolve`, `access:discover`. |
+| `get_job` | `projects:read` | Read job progress. Poll after `next_poll_after_ms`. |
+| `control_job` | `projects:write` | Pause, resume, cancel or retry failed steps. |
+| `list_references`, `get_reference` | `references:read` | Filter and read occurrences with candidates and access. |
+| `add_reference`, `update_reference` | `references:write` | Add a reference; edit, split, merge, exclude or restore it; select or reject candidates; set a DOI or fields; mark it unresolved. |
+| `resolve_citation` | `metadata:resolve` | Look up one citation without storing it. |
+| `attach_file` | `files:attach` | Attach a local PDF from an allowed folder. |
+| `download_files` | `files:download` | Download eligible copies. Off by default. |
+| `create_export` | `exports:create` | Export at a project revision. |
+| `draft_requests` | `drafts:create` | Draft copy-request messages. |
+| `list_artifacts`, `read_artifact` | `projects:read` | List export artifacts; read text in chunks of up to 64 KB. |
+
+The server also offers three prompts: `reconstruct-bibliography` (import, extract,
+resolve, review, find files and export), `review-uncertain` (propose decisions for
+`needs_review` references and apply only what you confirm) and `recover-copies`
+(discovery, local copies, download and request drafts). Decisions made through MCP
+are recorded as agent decisions. They never count as your own approval.
+
 Use the same `RC_HOME` for CLI setup and MCP when sharing projects. Default MCP
 scopes exclude `files:download`; a project download grant alone does not add that
 scope. MCP cannot raise its own scopes, enable retrieval, select browser
@@ -267,6 +300,46 @@ uv run python -m refcollector config set-key s2_key
 A provider without a required credential, or one that imposes rate limits, can
 reduce lookup coverage. Inspect warnings instead of treating missing results as
 proof that a work or copy does not exist.
+
+### Keys in `config.json`
+
+`config show --json` prints the current values. The CLI sets some keys. For the others,
+edit `RC_HOME/config.json` while no RefCollector process is running, then restart the
+servers. Unknown keys are rejected.
+
+| Key | Default | How to change |
+|---|---|---|
+| `email` | none | `config set email ADDRESS` |
+| `allow_folders` | empty list | `config allow-folder PATH` |
+| `mcp_scopes` | every scope except `files:download` | Edit the file. |
+| `enabled_providers` | `crossref`, `datacite`, `doiorg`, `openalex`, `semanticscholar`, `unpaywall`, `openlibrary` | Edit the file. Remove a name to stop using that provider. New jobs freeze the list. |
+| `download_enabled_global` | `false` | Edit the file. When `true`, downloads are allowed in every project, even without the project grant. Prefer `config downloads on` for one project. |
+| `pdf_fallback_url` | none | `config pdf-fallback` |
+| `pdf_browser_python`, `pdf_browser_binary` | none | `config pdf-browser` |
+| `limits` | see below | Edit the file. Give only the fields you change. |
+
+### Limits
+
+| Limit | Default |
+|---|---|
+| `pdf_bytes` | 104,857,600 (100 MiB) |
+| `pdf_pages` | 1,500 |
+| `occurrences_per_source` | 5,000 |
+| `pasted_text_bytes` | 1,048,576 (1 MiB) |
+| `citation_chars` | 4,000 |
+| `read_artifact_bytes` | 65,536 (64 KiB per read) |
+| `list_default`, `list_max` | 25, 100 |
+| `download_bytes` | 104,857,600 (100 MiB per file) |
+| `download_timeout_s` | 120 |
+| `max_redirects` | 5 |
+| `step_timeout_s`, `step_max_attempts` | 120, 5 |
+| `cursor_ttl_s` | 86,400 (24 hours) |
+| `idempotency_ttl_s` | 604,800 (7 days) |
+| `cache_ttl_identifier_s`, `cache_ttl_search_s` | 2,592,000 (30 days), 604,800 (7 days) |
+| `provider_exhausted_retry_after_s` | 60 |
+| `client_lock_poll_s`, `executor_poll_s` | 5, 0.5 |
+
+An input over a limit fails with `LIMIT_EXCEEDED`.
 
 ## Verification and development
 
@@ -312,6 +385,8 @@ or live retrieval coverage. See [release readiness](docs/orchestration/release-r
 
 Useful references:
 
+- [CLI reference and error codes](docs/CLI.md)
+- [User guide](docs/USER_GUIDE.md)
 - [Current specification](docs/spec/refcollector-spec-v3.md)
 - [Integration status and verification limits](docs/orchestration/status.md)
 - [PDF fallback setup](docs/orchestration/pdf-fallback.md)
@@ -361,8 +436,10 @@ package; running the installed web app does not require Node.js.
 
 ### Library workflow
 
-1. Select **New collection**, enter a name, and choose its folder. Existing collections
-   can be renamed, pinned to the top of the sidebar, or deleted. Deleting a collection
+1. Select **New collection**, enter a name, and choose its folder. The dialog proposes
+   `~/RefCollector/<name>` (in your home folder). Existing collections
+   can be renamed, pinned to the top of the sidebar (stored in this browser only), or deleted.
+   Delete asks you to type the collection name and is blocked while jobs are active. Deleting a collection
    removes the project record from RefCollector, but preserves the confirmed collection
    folder and all its files on disk.
 2. Open **Review permissions**. Confirm folder access, retrieval network mode,
@@ -385,8 +462,10 @@ package; running the installed web app does not require Node.js.
 8. Verified PDFs appear on the shelf with **Cited by** links and are copied to the
    collection folder. Open a downloaded citation or paper card to view its PDF in the
    in-app viewer. Repeating a download reuses existing copies rather than creating duplicate files.
-9. Switch between the **Library** and the **Advanced dashboard** (`/advanced`) at any time.
-   Theme settings (Light / Dark) are shared across both interfaces.
+9. Switch between the **Library** and the Advanced dashboard at any time with the
+   **Library | Advanced** switch (the dashboard is at `/advanced`). The theme has three
+   options: **Light**, **Dark** and **System**. **System** is the default and follows your
+   operating system. The choice is shared across both interfaces.
 
 DOI-first downloads verify against the DOI in the citation, independently of disputed
 provider metadata. Network and PDF safety checks still apply. A DOI found only in a

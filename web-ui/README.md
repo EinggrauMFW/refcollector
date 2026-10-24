@@ -8,7 +8,7 @@ Design direction: [DESIGN.md](DESIGN.md).
 
 ## Commands
 
-Node 22 and npm 10 or newer.
+Tested with Node 22 and npm 10. `package.json` sets no `engines` range.
 
 ```
 cd web-ui
@@ -48,12 +48,12 @@ server checks `Host` and `Origin` exactly, so the proxy (`vite.config.ts`) sets 
 | `src/api/mock.ts` | In-memory implementation |
 | `src/api/index.ts` | Picks mock or client from `VITE_API_MOCK` |
 | `src/lib/` | Status mapping, hash route, permission rows, formatting, hooks (async data, job polling, theme) |
-| `src/components/` | Sidebar, shelf, paper row, citation and Check panel, permission panel, PDF viewer |
+| `src/components/` | Sidebar, shelf, paper row, citation and Check panel, file approval panel (`FilePanel`), permission panel, PDF viewer, collection create dialog (`CollectionDialog`), collection delete dialog (`DeleteCollectionDialog`), Library \| Advanced switch (`ModeSwitch`) |
 | `src/styles.css` | Tokens (light and dark through `light-dark()`) and all styles |
 
 ## Rules that come from the server
 
-- CSP is `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:`.
+- CSP for the Library page is `default-src 'self'; img-src 'self' blob:; script-src 'self'; style-src 'self'; object-src 'none'; frame-ancestors 'none'; frame-src 'self'` (`src/refcollector/web/security.py`). Responses of the PDF file route use `frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN` instead, so the viewer iframe can show them.
   The built `index.html` has no inline script or style. Components never use a `style` attribute:
   widths are SVG attributes or native `<progress>`. No remote fonts and no font packages: the type
   is a system stack.

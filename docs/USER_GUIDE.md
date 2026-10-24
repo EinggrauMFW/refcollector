@@ -1,7 +1,8 @@
 # Refcollector user guide
 
 This guide covers the current Library UI. The older application is documented
-in the legacy section below. For CLI commands, see [README](../README.md).
+in the legacy section below. For CLI commands and error codes, see the
+[CLI reference](CLI.md). For installation and setup, see the [README](../README.md).
 
 ## Open the Library
 
@@ -13,14 +14,21 @@ uv run --extra web --frozen python -m refcollector serve web --host 127.0.0.1 --
 ```
 
 Open <http://127.0.0.1:8001/>. In Jean, use the configured Run command instead
-of starting a second server. The advanced dashboard is at `/advanced`.
+of starting a second server. Use the **Library | Advanced** switch to move between the
+Library and the Advanced dashboard. The dashboard is at `/advanced`.
 
 ## Create a collection and grant access
 
-1. Choose **New collection** and enter its name and folder.
-2. In the collection sidebar, collections can be renamed, pinned to the top of the list,
-   or deleted. Deleting a collection removes the project from RefCollector, but preserves
-   the collection folder and all its files on disk.
+1. Choose **New collection** and enter its name and folder. The dialog proposes
+   `~/RefCollector/<name>`, where `~` is your home folder. You can choose another folder.
+2. In the collection sidebar, open the options menu of a collection to rename it, pin it
+   to the top of the list, or delete it.
+   - Pins are stored in this browser only. Another browser, or cleared site data, shows no pins.
+   - **Delete** shows how many papers and citations it removes. You must type the
+     collection name to confirm. Delete is blocked while jobs of the collection are
+     running or queued. Wait for them or cancel them first.
+   - Deleting a collection removes the project from RefCollector, but preserves
+     the collection folder and all its files on disk.
 3. Open **Review permissions** for the collection.
 4. Grant folder access, retrieval network mode, and downloads. Each change has
    its own description and confirmation. Cancel leaves that setting unchanged.
@@ -31,7 +39,9 @@ copy does not change the stored reference record.
 
 ## Upload and check references
 
-1. Choose **Upload PDFs**, or drop a PDF onto the shelf.
+1. Choose **Upload PDFs**, or drop a PDF onto the shelf. The file must be a PDF.
+   Uploading the same file again returns the existing paper and does not start a second
+   extraction.
 2. Wait for extraction. Expand the uploaded paper to inspect its citations.
 3. To get PDFs immediately, choose **Download PDFs by DOI**. You do not need to
    run **Find metadata** or approve a metadata match first.
@@ -45,9 +55,10 @@ or opening a PDF that passed its checks. You can leave metadata unresolved.
 
 | Citation state | Meaning and next action |
 |---|---|
+| Working | A job is processing this citation. Wait. The row updates when the job ends. |
 | Extracted | Citation text exists. Find metadata. |
 | Check | Identity, extraction, or a downloaded PDF needs inspection. Open the row. |
-| No match | No accepted identity. Inspect candidates or use the advanced dashboard for repair. |
+| No match | No accepted identity. Inspect candidates or use **Advanced** for repair. |
 | Matched | Identity is accepted; access discovery has not completed. |
 | PDF available | Discovery found an eligible location. Download permission and version policy still apply. |
 | No PDF | Discovery found no eligible copy under the current result. This does not prove paywall status. |
@@ -76,16 +87,36 @@ then confirm the description. One confirmation approves one file. Approval marks
 the file verified and records the overridden checks in the audit. **Reject PDF**
 keeps the file unverified and records the rejection.
 
+A **Check** row shows **Review file** when a PDF waits for your decision. It shows
+**Review** when a metadata identity waits for your choice.
+
 Verified PDFs appear on the shelf with **Cited by**. Click a downloaded citation
-to open its PDF. The collection folder receives a copy. Repeating **Download all**
+to open its PDF. The PDF opens in a viewer panel with three controls:
+**Copy path** copies the file path in the collection folder (it is disabled until the file
+is in the folder), **New tab** opens the PDF in a browser tab, and **Close** closes
+the panel. Esc also closes it. The collection folder receives a copy. Repeating **Download all**
 does not intentionally create duplicates; existing usable copies take priority.
 File approval is available through the confirmed web flow, not through MCP.
 
 ## Find papers and resolve problems
 
 Search the shelf by title, author, year, venue, or DOI. Use the kind and citation
-status filters to narrow the list. Light and dark themes are available and shared
-with the Advanced dashboard (`/advanced`).
+status filters to narrow the list. The status filter offers Needs check, Missing PDF,
+Downloaded and Failed.
+
+The theme has three options: **Light**, **Dark** and **System**. **System** is the default.
+It follows your operating system. The choice is shared with the Advanced dashboard
+(`/advanced`).
+
+Keyboard shortcuts:
+
+| Key | Action |
+|---|---|
+| `/` | Focus the search box (when you are not typing in a field). |
+| Esc in the search box | Clear the search. |
+| Up and Down arrows, Home, End | Move between papers on the shelf. |
+| Enter or Space | Expand or collapse the focused paper. |
+| Esc inside an expanded paper | Close the open citation first, then the paper. |
 
 | Problem | Action |
 |---|---|
@@ -96,7 +127,13 @@ with the Advanced dashboard (`/advanced`).
 | DOI download is unavailable | Check that the citation has one clear DOI and that the trusted DOI service is configured. |
 | A job finishes with warnings | Read the per-citation reasons. Provider failures and version-policy skips can affect individual papers. |
 | A confirmation expires or the reference changes | Reopen the action and inspect a new confirmation. |
-| Export or detailed reference repair is needed | Open **Advanced dashboard**. CLI usage is documented in README. |
+| An upload fails | Read the message. Common causes are a file that is not a PDF, a PDF over 100 MB or 1,500 pages, a PDF with a password, and a server that has stopped. The error codes are in the [CLI reference](CLI.md). |
+| A scanned PDF gives no citations | The bibliography pages have no text layer. RefCollector has no OCR. Use a PDF with selectable text, or add references in **Advanced**. |
+| A file is refused as "not a PDF" | The browser must send the file as `application/pdf`. Check that the file opens in a PDF reader. Upload the PDF itself, not a web page or an image. |
+| You upload a file twice | Nothing breaks. RefCollector finds the same content and shows the existing paper. It does not extract again. |
+| **Delete collection** stays disabled | Type the exact collection name. The button also stays disabled while jobs of the collection run or wait in the queue. Wait or cancel them. |
+| Pinned collections are gone | Pins live in this browser only. Pin them again in the browser you use. |
+| Export or detailed reference repair is needed | Choose **Advanced** in the **Library \| Advanced** switch. CLI usage is in the [CLI reference](CLI.md). |
 
 ## Legacy application reference
 

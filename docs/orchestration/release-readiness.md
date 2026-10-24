@@ -1,14 +1,16 @@
 # Source-and-wheel release readiness
 
-Date: 22 October 2026. Candidate version: 0.2.0.dev0. Scope: an AGPLv3-only source
-archive and dependency-resolving Python wheel. No publication has occurred.
+Date: 22 October 2026. Candidate version: 0.2.0b1. The evidence below was gathered
+on earlier 0.2.0.dev0 builds on 22 October 2026 and is a dated record. Scope: an
+AGPLv3-only source archive and dependency-resolving Python wheel. No publication has occurred.
 
 **Status: earlier package preparation passed; quality benchmark remains open.** These
 results do not establish a completed P0 release or full web acceptance.
 
 Follow-up: corpus review found and fixed a blank-separator OCR false positive in
-the built-in PDF extractor. The current combined gate passed 1,331 tests in
-169.66 seconds, plus lint and formatting for 225 Python files. The original
+the built-in PDF extractor. On 22 October 2026 the combined gate passed 1,331 tests in
+169.66 seconds, plus lint and formatting for 225 Python files. The suite now collects
+1,559 tests (checked 24 October 2026; the README records the latest gate). The original
 artifact hashes and multi-version clean-install results below describe the
 earlier build. See [current corpus status](../../benchmarks/pilot/corpus-status.md).
 
@@ -32,7 +34,7 @@ earlier build. See [current corpus status](../../benchmarks/pilot/corpus-status.
 | Installed web component | In-process ASGI lifespan, static assets, session, capabilities, project reads, Host and CSRF rejection | Passed with the web extra |
 | Fresh web dependency | FastAPI 0.159.1, beyond the locked 0.156.4 | 49 focused web tests passed |
 | Earlier combined repository gate | scripts/check.py with updated locked certifi | 1,324 tests passed in 208.08 seconds; lint and 224-file format checks passed |
-| Current combined repository gate | Blank-separator fix and seven new regression cases | 1,331 tests passed in 169.66 seconds; lint and 225-file format checks passed |
+| Later combined repository gate (22 October 2026) | Blank-separator fix and seven new regression cases | 1,331 tests passed in 169.66 seconds; lint and 225-file format checks passed |
 | Follow-up core installations | Current wheel on Windows Python 3.11.17 and 3.13.15; current source on 3.13.15 | Three fresh environments passed dependency checks, 11 CLI commands each, MCP import, and blank-separator/real-thesis extraction. Live web was not retested. |
 | Subsequent live HTTP follow-up | Jean-managed http://127.0.0.1:8001/ with development sources only | Upload, extraction, PNG rendering, source downloads, 312-row JSON/CSV audit exports, artifact hashes, and request guards passed. Browser UI startup did not complete. |
 

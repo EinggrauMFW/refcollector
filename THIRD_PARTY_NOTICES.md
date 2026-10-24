@@ -1,6 +1,6 @@
 # Third-party dependency notices
 
-This notice applies to RefCollector 0.2.0.dev0's source archive and Python wheel.
+This notice applies to RefCollector 0.2.0b1's source archive and Python wheel.
 Those artifacts contain project source and static web assets. They do not bundle
 third-party Python packages, Python itself, Chromium or SeleniumBase.
 

@@ -1000,7 +1000,7 @@ def serve(
         except ImportError as e:
             raise FeatureNotAvailable(
                 "The web extra is not installed.",
-                recovery_hint="Install with: pip install refcollector[web]",
+                recovery_hint="Install with: uv sync --extra web",
             ) from e
         run_web(load_settings(), host=host, port=port)
         return

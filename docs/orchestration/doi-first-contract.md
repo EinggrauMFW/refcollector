@@ -70,7 +70,7 @@ resolution. Preserve endpoint origin/guard restrictions; no new CAPTCHA techniqu
 ## Frontend interface (owned by UI worker)
 
 Mirror additive fields, using optional defaults for older/mock responses. The existing
-collection/paper Download with fallback action becomes DOI-first without metadata review.
+collection/paper **Download PDFs by DOI** action becomes DOI-first without metadata review.
 Offer a DOI download action on metadata Check/unprocessed rows with can_download_by_doi,
 sending use_fallback=true for that citation. Do not auto-select/confirm metadata candidates.
 Verified DOI files open immediately; metadata pending is informational and not a file gate.

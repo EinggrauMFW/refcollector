@@ -185,21 +185,29 @@ settings confirm routes do.
 
 | Method and path | Body / query | Response |
 |---|---|---|
+| `GET /defaults` | | `DefaultsOut` (`default_root`, see section 8) |
 | `GET /collections` | | `list[Collection]` |
-| `POST /collections` | `CreateCollectionIn` | `Collection` (creates project and folder record; grants nothing) |
+| `POST /collections` | `CreateCollectionIn` (`name`, `folder`, `idempotency_key`) | `Collection` (creates project and folder record; grants nothing) |
+| `PATCH /collections/{cid}` | `RenameCollectionIn` (`name`) | `Collection` |
+| `GET /collections/{cid}/consequences` | | `CollectionConsequences` (paper, citation and file counts; `has_active_jobs`) |
+| `DELETE /collections/{cid}` | | `204`, no body. Removes the project and folder record. Files on disk stay. |
 | `POST /collections/{cid}/permissions/intent` | `PermissionIntentIn` | `Intent` |
 | `POST /collections/{cid}/permissions/confirm` | `PermissionIntentIn` + token header | `Collection` |
-| `GET /collections/{cid}/shelf` | `q`, `kind`, `status`, `cursor`, `limit<=100` | `ShelfPage` |
-| `POST /collections/{cid}/papers` | multipart `file` (PDF) + `idempotency_key` | `PaperCard` with `active_job_id` |
+| `GET /collections/{cid}/shelf` | query `q`, `kind`, `status`, `cursor`, `limit` (1-100, default 50) | `ShelfPage` |
+| `POST /collections/{cid}/papers` | multipart `file` (`application/pdf`) + `idempotency_key` (8-128 characters) | `PaperCard` with `active_job_id` |
 | `GET /collections/{cid}/papers/{pid}` | | `PaperDetail` |
-| `POST /collections/{cid}/find-metadata` | `RunIn` | `Accepted` |
-| `POST /collections/{cid}/download` | `RunIn` | `Accepted` |
+| `POST /collections/{cid}/find-metadata` | `RunIn` (`paper_id?`, `citation_id?`, `use_fallback`, `idempotency_key`) | `Accepted` |
+| `POST /collections/{cid}/download` | `RunIn` (`use_fallback=true` selects the DOI-first path, section 9) | `Accepted` |
 | `GET /collections/{cid}/citations/{oid}` | | `CitationDetail` |
 | `POST /collections/{cid}/citations/{oid}/review/intent` | `ReviewIn` | `Intent` |
 | `POST /collections/{cid}/citations/{oid}/review/confirm` | `ReviewIn` + token header | `Citation` |
+| `POST /collections/{cid}/citations/{oid}/file-review/intent` | `FileReviewIn` (`work_file_id`, `file_kind`, `action`, `expected_revision`, `idempotency_key`) | `Intent` |
+| `POST /collections/{cid}/citations/{oid}/file-review/confirm` | `FileReviewIn` + token header | `Citation` |
 | `POST /collections/{cid}/sync` | | `Collection` (retry folder sync) |
 | `GET /collections/{cid}/jobs/{jid}` | | `JobStatus` |
-| `GET /collections/{cid}/files/{kind}/{id}` | `kind in {source, work_file}` | PDF, `inline` disposition |
+| `GET /collections/{cid}/files/{kind}/{id}` | `kind in {source, work_file, local_copy, citation_file}` | PDF, `inline` disposition |
+
+Every route needs a session. Every mutation (`POST`, `PATCH`, `DELETE`) also needs a CSRF token.
 
 Errors: existing body `{code, message, retryable, recovery_hint, details?, retry_after?}`
 and status codes from `app.py` `rc_error_handler`.

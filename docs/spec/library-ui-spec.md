@@ -1,6 +1,6 @@
 # RefCollector Library UI specification
 
-Date: 22 October 2026. Status: draft for W0 contract freeze. Owner decisions: user, 22 October 2026.
+Date: 22 October 2026. Status: implemented in 0.2.0b1. Later sections may describe superseded proposals; the code and `docs/orchestration/library/contract.md` win where they differ. Owner decisions: user, 22 October 2026.
 
 ## 1. Goal
 
@@ -96,19 +96,27 @@ folder-sync service call.
 
 | Method and path | Service calls | Returns |
 |---|---|---|
+| `GET /defaults` | none | `default_root`: `~/RefCollector`, the proposed parent folder of a new collection |
 | `GET /collections` | `list_projects`, `get_settings` | Collections with folder, counts, effective download/network state |
-| `POST /collections` | `create_project`, `prepare_web_settings` | Collection id plus a permission intent to confirm |
-| `POST /collections/{cid}/permissions/confirm` | `update_web_settings` | Effective permissions |
-| `GET /collections/{cid}/shelf?q=&kind=&status=&after=` | `list_sources`, `list_references`, work files | Paper cards (paged) |
+| `POST /collections` | `create_project`, folder record | The new collection. It grants nothing. |
+| `PATCH /collections/{cid}` body `{name}` | `rename_project` | The renamed collection |
+| `GET /collections/{cid}/consequences` | `get_project_consequences`, folder record | Paper, citation and file counts, and whether jobs are active |
+| `DELETE /collections/{cid}` | `delete_project`, folder record | `204`. Files on disk stay. |
+| `POST /collections/{cid}/permissions/intent` | `prepare_web_settings` | A permission intent to confirm |
+| `POST /collections/{cid}/permissions/confirm` | `confirm_web_settings` | Effective permissions |
+| `GET /collections/{cid}/shelf?q=&kind=&status=&cursor=&limit=` | `list_sources`, `list_references`, work files | Paper cards (paged). `limit` is 1-100, default 50. |
 | `POST /collections/{cid}/papers` (multipart) | `upload_pdf`, `start_job(extract)`, folder sync | Paper card plus job id |
 | `GET /collections/{cid}/papers/{pid}` | `get_source` / work lookup, `list_references` | Paper detail with citations |
-| `POST /collections/{cid}/find-metadata` body `{paper_id?}` | `start_job(resolve, discover_access)` | Job id |
-| `POST /collections/{cid}/download` body `{paper_id?}` | `download_files` | Job id or disabled reason |
+| `POST /collections/{cid}/find-metadata` body `{paper_id?, citation_id?}` | `start_job(resolve, discover_access)` | Job id |
+| `POST /collections/{cid}/download` body `{paper_id?, citation_id?, use_fallback?}` | `download_files` | Job id or disabled reason. `use_fallback` selects the DOI-first path. |
 | `GET /collections/{cid}/citations/{oid}` | `get_reference` | Candidates, scores, reasons, revision |
-| `POST /collections/{cid}/citations/{oid}/review` | `prepare_web_review` | Review intent to confirm |
-| `POST /collections/{cid}/citations/{oid}/review/confirm` | existing confirmed web review path | Updated citation |
+| `POST /collections/{cid}/citations/{oid}/review/intent` | `prepare_web_review` | Review intent to confirm |
+| `POST /collections/{cid}/citations/{oid}/review/confirm` | `confirm_web_review` | Updated citation |
+| `POST /collections/{cid}/citations/{oid}/file-review/intent` | `prepare_web_file_review` | File decision intent to confirm |
+| `POST /collections/{cid}/citations/{oid}/file-review/confirm` | `confirm_web_file_review` | Updated citation |
+| `POST /collections/{cid}/sync` | folder sync | The collection, after a retry of the folder copy |
 | `GET /collections/{cid}/jobs/{jid}` | `get_job` | Progress, stage counts, terminal state |
-| `GET /collections/{cid}/files/{kind}/{id}` | `read_project_file` | PDF stream, `Content-Disposition: inline` |
+| `GET /collections/{cid}/files/{kind}/{id}` | `read_project_file` | PDF stream, `Content-Disposition: inline`. `kind` is `source`, `work_file`, `local_copy` or `citation_file`. |
 
 DTOs are Pydantic models in `src/refcollector/web/library_api.py` and mirrored as
 TypeScript types in `web-ui/src/api/types.ts`. W0 freezes both. Error bodies reuse the

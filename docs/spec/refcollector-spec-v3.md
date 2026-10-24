@@ -1,6 +1,6 @@
 # RefCollector: Implementation Specification v3
 
-**Date:** 20 October 2026 · **Owner:** Faris · **Status:** proposed, not implemented
+**Date:** 20 October 2026 · **Owner:** Faris · **Status:** implemented in 0.2.0b1. Later sections may describe superseded proposals; the [decision log](../orchestration/decisions.md) and the code win where they differ.
 **Repository baseline:** `13771b410a5e720c15a52b15d61828dbb42cc11d`
 **Supersedes:** merged spec v2 (same date). Changes are mapped in Appendix A.
 
@@ -551,7 +551,7 @@ In: `{project_id, artifact_id, offset?, length?}` · Out: `{descriptor, text?, e
 Each error carries `{code, message, retryable, recovery_hint, details?}`.
 
 ### 11.6 Resources and prompts (P0)
-- Resources (optional convenience; tools cover everything): `refcollector://projects/{project_id}/summary`, `refcollector://projects/{project_id}/references/{occurrence_id}`, `refcollector://projects/{project_id}/artifacts/{artifact_id}`.
+- Resources (optional convenience; tools cover everything): `refcollector://projects/{project_id}/summary`, `refcollector://projects/{project_id}/references/{occurrence_id}`, `refcollector://projects/{project_id}/artifacts/{artifact_id}`. **Not implemented in 0.2.0b1:** the MCP server offers tools and prompts only.
 - Prompts: `reconstruct-bibliography` (steps 1–7 of section 4), `review-uncertain` (walk `needs_review`, propose decisions, apply only what the user confirms in chat; recorded as agent decisions), `recover-copies` (discovery, local copies, download, report).
 
 ---
@@ -590,7 +590,7 @@ Each error carries `{code, message, retryable, recovery_hint, details?}`.
 `project create|list|show` · `import` · `sections` · `run --stages` · `jobs` · `list` · `show` · `review` (TTY approval surface: accept, choose, reject, set DOI, edit, split, merge, exclude, add) · `edit` · `split` · `merge` · `add` · `exclude` · `attach` · `download` · `export --revision N` · `requests` · `serve [mcp|web]` · `config`.
 
 ### 14.2 Packaging
-P0: PyPI package, run as `uvx refcollector serve mcp`. P1: `.mcpb` bundle, Docker Compose (optional GROBID profile), MCP Registry entry, local Streamable HTTP on loopback. P2: hosted connector.
+P0: PyPI package, run as `uvx refcollector serve mcp`. **Status in 0.2.0b1:** no PyPI release exists yet. Install from the tagged source and run `uv run python -m refcollector serve mcp` (see the README). P1: `.mcpb` bundle, Docker Compose (optional GROBID profile), MCP Registry entry, local Streamable HTTP on loopback. P2: hosted connector.
 Stack: Python 3.11+, official `mcp` SDK, Pydantic v2, `httpx`, `aiolimiter`, `tenacity`, PyMuPDF, `rapidfuzz`, SQLite with migrations, FastAPI, Typer, `bibtexparser` v2, `platformdirs`, `keyring`, `portalocker` (cross-platform file lock).
 
 ### 14.3 Licensing (release gate)

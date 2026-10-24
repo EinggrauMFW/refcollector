@@ -1,6 +1,6 @@
 # RefCollector local web application specification
 
-Date: 21 October 2026. Status: implementation in progress; final acceptance pending. Command: `refcollector serve web`.
+Date: 21 October 2026. Status: implemented in 0.2.0b1 (beta); final acceptance is still pending. Later sections may describe superseded proposals; the code and the [decision log](../orchestration/decisions.md) win where they differ. Command: `refcollector serve web`.
 
 This document replaces the incomplete fragment. It specifies behavior and contract changes, not application code or release approval.
 
@@ -418,3 +418,53 @@ Use deterministic fake/recorded providers, isolated homes, and approved fixtures
 Freeze contracts before dependent UI work. Then separate service additions, HTTP/session boundary, read-only screens, mutation/review/settings screens, and independent acceptance review. Pipeline changes stay outside interface tasks.
 
 Done requires recorded decision amendments, compatible contracts, reviewed concrete routes, web gates passing in a running local environment, CLI/MCP regression evidence, and parent licensing/security/release checks. Test counts do not prove benchmarks. This specification does not make the application ready to publish.
+
+## 13. HTTP route reference (0.2.0b1)
+
+This section lists the routes in `src/refcollector/web/routes.py`, mounted under `/api`.
+The Library routes under `/api/library` are in [library-ui-spec.md](library-ui-spec.md#6-library-http-api)
+and [library/contract.md](../orchestration/library/contract.md). Read routes need a session cookie.
+Every `POST` also needs the `X-CSRF-Token` header from `GET /api/session`. Confirm routes
+also need `X-Confirmation-Token`. `{p}` means a project ID.
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /api/session` | Start or reuse a session. Returns the CSRF token and the OS user name. |
+| `GET /api/capabilities` | Server version, providers, export formats, limits, granted scopes. |
+| `GET /api/executor/status` | Executor owner and heartbeat. |
+| `GET /api/projects` | List projects (`cursor`, `limit`). |
+| `POST /api/projects` | Create a project. |
+| `GET /api/projects/{p}` | Read one project with counts and recent jobs. |
+| `GET /api/projects/{p}/sources` | List sources (`cursor`, `limit`). |
+| `POST /api/projects/{p}/sources/import` | Import pasted text or an allowed local file. |
+| `GET /api/projects/{p}/sources/{source_id}` | Read preflight, sections and warnings. |
+| `POST /api/projects/{p}/sources/{source_id}/sections` | Set bibliography page ranges. |
+| `GET /api/projects/{p}/sources/{source_id}/pages/{page_index}` | Render one page as a PNG (`scale`). |
+| `POST /api/projects/{p}/uploads/pdf` | Upload a PDF as a source or a local copy (multipart). |
+| `GET /api/jobs` | List jobs of all projects (`project_id`, `states`, `cursor`, `limit`). |
+| `GET /api/projects/{p}/jobs` | List jobs of one project (`states`, `cursor`, `limit`). |
+| `POST /api/projects/{p}/jobs` | Start a job. |
+| `GET /api/projects/{p}/jobs/{job_id}` | Read job progress. |
+| `POST /api/projects/{p}/jobs/{job_id}/control` | Pause, resume, cancel or retry failed steps. |
+| `GET /api/projects/{p}/references` | List occurrences. Filters: `source_id`, `job_id`, `extraction`, `identity`, `discovery`, `classification`, `classification_is_null`, `local_copy`, `retrieval`, `reason`, `query`, `sort`, `fields`, `cursor`, `limit`. |
+| `POST /api/projects/{p}/references` | Add a reference. |
+| `GET /api/projects/{p}/references/{occurrence_id}` | Read one occurrence (`sections`). |
+| `POST /api/projects/{p}/references/update` | Edit, split, merge, exclude, restore, set DOI or fields, or mark unresolved. |
+| `POST /api/resolve`, `POST /api/resolve-citation` | Look up one citation without a project (same handler). |
+| `POST /api/projects/{p}/references/{occurrence_id}/attach` | Attach a local PDF. |
+| `POST /api/projects/{p}/download`, `POST /api/projects/{p}/files/download` | Start a download job (same handler). |
+| `POST /api/projects/{p}/exports` | Create an export. |
+| `POST /api/projects/{p}/drafts` | Draft copy-request messages. |
+| `GET /api/artifacts` | List artifacts of all projects (`kind`, `cursor`, `limit`). |
+| `GET /api/projects/{p}/artifacts` | List artifacts of one project. |
+| `GET /api/projects/{p}/artifacts/{artifact_id}/text` | Read artifact text (`offset`, `length`). |
+| `GET /api/projects/{p}/files/{kind}/{resource_id}` | Stream a file. `kind` is `source`, `work_file`, `artifact` or `local_copy`. |
+| `GET /api/settings` | Read settings (`project_id` optional). |
+| `POST /api/settings/intent` | Prepare a settings change. Returns an intent and a confirmation token. |
+| `POST /api/settings` | Confirm a settings change. Needs `X-Confirmation-Token`. |
+| `POST /api/projects/{p}/references/{occurrence_id}/review-intent` | Prepare a trusted review decision. |
+| `POST /api/projects/{p}/references/{occurrence_id}/review` | Confirm a trusted review decision. Needs `X-Confirmation-Token`. |
+| `POST /api/projects/{p}/settings` | Always fails with `FEATURE_NOT_AVAILABLE`. Use `/api/settings` or the CLI. |
+
+Outside `/api`: `GET /` serves the Library, `GET /advanced` serves the dashboard, and
+`GET /static/...` serves assets. Other `GET` paths outside `/api` fall back to the Library page.

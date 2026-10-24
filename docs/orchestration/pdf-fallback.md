@@ -38,7 +38,7 @@ and encoded as one path component.
 
 ## Library UI
 
-The collection toolbar and each uploaded paper have a **Download with fallback**
+The collection toolbar and each uploaded paper have a **Download PDFs by DOI**
 button. The button tries normal sources first, then the configured fallback preset.
 It selects `any_eligible` for this job only. It does not change the collection policy
 or configure a preset. Configure the preset through the trusted local CLI first.
@@ -138,5 +138,7 @@ The downloader rejected those responses. Raw and uppercase DOI paths behaved the
 same way. Mirror responses can change; homepage HTTP 200 or a passed checkbox
 does not prove a working PDF URL. Refcollector does not guess storage paths.
 
-The full repository gate passed 1,179 tests, lint and formatting. Standalone
+Historical record: when browser-assisted resolution was added, the full repository gate
+passed 1,179 tests, lint and formatting (see `status.md`; no date is recorded there).
+The current suite collects 1,559 tests (checked 24 October 2026). Standalone
 Windows Chrome containment was checked separately with the actual browser.
