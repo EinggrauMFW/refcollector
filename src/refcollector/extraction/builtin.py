@@ -106,7 +106,10 @@ class BuiltinExtractionAdapter:
                     raise ReferenceSectionNotFound()
             entries = []
             for section in chosen:
-                if any(not source[pi].has_text for pi in range(section.page_start, section.page_end + 1)):
+                if any(
+                    not source[pi].has_text and not source[pi].is_blank
+                    for pi in range(section.page_start, section.page_end + 1)
+                ):
                     raise OcrRequired()
                 entries.extend(entries_from_lines(section_lines(source, section), section.section_id))
         self._limit("occurrences_per_source", len(entries))

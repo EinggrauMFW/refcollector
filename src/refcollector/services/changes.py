@@ -30,6 +30,7 @@ from refcollector.contracts.ports import OccurrenceQuery, ResolutionResult, Scor
 from refcollector.domain.enums import (
     ApprovalSurface,
     AuditEventType,
+    Channel,
     DecisionAction,
     ExtractionState,
     IdentityState,
@@ -554,13 +555,14 @@ def review(svc: RefCollectorServiceImpl, tx: Tx, req: ReviewDecisionIn) -> Outco
     occ.work_id, occ.accepted_candidate_id = work.work_id, cand.candidate_id
     occ.identity, occ.identity_reasons = IdentityState.ACCEPTED_USER, list(cand.reasons)
     # The commit that records the approval bumps the revision and stores the new value (D-20, W-18).
+    surface = ApprovalSurface.WEB_UI if tx.ctx.channel == Channel.WEB_UI else ApprovalSurface.CLI_TTY
     approval = Approval(
         approval_id=new_id("approval"),
         action=DecisionAction.ACCEPT,
         candidate_id=cand.candidate_id,
         occurrence_revision=occ.revision + 1,
         approved_at=tx.now,
-        surface=ApprovalSurface.CLI_TTY,
+        surface=surface,
     )
     occ.approval = approval
     new = save(svc, occ, req.expected_revision)

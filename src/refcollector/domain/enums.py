@@ -73,7 +73,8 @@ class Channel(StrEnum):
     CLI = "cli"
     CLI_TTY_REVIEW = "cli_tty_review"
     EXECUTOR = "executor"
-    # "web_ui" is P1 (spec 3) and absent here.
+    # "web_ui" is P1 (spec 3) and absent here in the original P0 baseline.
+    WEB_UI = "web_ui"
 
 
 class Origin(StrEnum):
@@ -84,6 +85,7 @@ class Origin(StrEnum):
 
 class ApprovalSurface(StrEnum):
     CLI_TTY = "cli_tty"
+    WEB_UI = "web_ui"
 
 
 class DecisionAction(StrEnum):
@@ -150,6 +152,7 @@ class StepType(StrEnum):
     RESOLVE = "resolve"
     DISCOVER_ACCESS = "discover_access"
     RETRIEVE = "retrieve"
+    RETRIEVE_DOI = "retrieve_doi"
     EXPORT = "export"
     DRAFT = "draft"
 
@@ -177,6 +180,7 @@ class ReasonCode(StrEnum):
     POSSIBLE_MERGED_REFERENCE = "POSSIBLE_MERGED_REFERENCE"
     POSSIBLE_TRUNCATED_REFERENCE = "POSSIBLE_TRUNCATED_REFERENCE"
     APPROVAL_STALE = "APPROVAL_STALE"
+    FILE_REJECTED_BY_USER = "FILE_REJECTED_BY_USER"
 
 
 class ExtractionWarning(StrEnum):
@@ -200,6 +204,8 @@ class AuditEventType(StrEnum):
     DECISION_RECORDED = "DECISION_RECORDED"
     APPROVAL_RECORDED = "APPROVAL_RECORDED"
     APPROVAL_STALE = "APPROVAL_STALE"
+    FILE_APPROVED = "FILE_APPROVED"
+    FILE_REJECTED = "FILE_REJECTED"
     FIELDS_SET = "FIELDS_SET"
     LOCKS_SET = "LOCKS_SET"
     ACCESS_CHECKED = "ACCESS_CHECKED"

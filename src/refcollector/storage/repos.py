@@ -23,6 +23,7 @@ from refcollector.domain.models import (
     AccessCheck,
     Artifact,
     Candidate,
+    CitationFile,
     Decision,
     LocalCopy,
     Model,
@@ -170,6 +171,38 @@ class SqliteProjectRepo(_Table[Project]):
             raise _not_found(project_id)
         return int(rows[0][0])
 
+    def get_counts(self, project_id: str) -> tuple[int, int]:
+        row_paper = self.db.query_one("SELECT count(*) FROM source WHERE project_id = ?", (project_id,))
+        paper_count = row_paper[0] if row_paper else 0
+        row_cite = self.db.query_one("SELECT count(*) FROM occurrence WHERE project_id = ?", (project_id,))
+        cite_count = row_cite[0] if row_cite else 0
+        return paper_count, cite_count
+
+    def delete(self, project_id: str) -> None:
+        """Permanently delete a project and its project-scoped records across dependent tables.
+
+        Strict leaf-to-root deletion order respecting SQLite foreign keys.
+        Does NOT delete audit history (preserves audit integrity) or shared file blobs.
+        """
+        with self.db.transaction(immediate=True):
+            self.get(project_id)
+            self.db.execute("DELETE FROM citation_file WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM candidate WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM decision WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM occurrence_reason WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM job_occurrence WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM step WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM job WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM access_check WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM local_copy WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM work_file WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM project_work WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM occurrence WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM source WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM file_grant WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM artifact WHERE project_id = ?", (project_id,))
+            self.db.execute("DELETE FROM project WHERE id = ?", (project_id,))
+
 
 class SqliteSourceRepo(_Table[Source]):
     table, model, key = "source", Source, "source_id"
@@ -314,6 +347,10 @@ class SqliteOccurrenceRepo(_Table[Occurrence]):
         if query.ids is not None:
             where.append(f"o.id {_IN}")
             params.append(json.dumps(list(query.ids)))
+        if query.classification_is_null is True:
+            where.append("o.classification IS NULL")
+        elif query.classification_is_null is False:
+            where.append("o.classification IS NOT NULL")
         if query.job_id is not None:
             where.append(
                 "o.id IN (SELECT occurrence_id FROM job_occurrence WHERE job_id = ? AND project_id = ?)"
@@ -466,6 +503,9 @@ class SqliteLocalCopyRepo(_Table[LocalCopy]):
     def add(self, copy: LocalCopy) -> LocalCopy:
         return self._insert(copy)
 
+    def get(self, project_id: str, local_copy_id: str) -> LocalCopy:
+        return self._get(project_id, local_copy_id)
+
     def list_for_work(self, project_id: str, work_id: str) -> list[LocalCopy]:
         return self._select("project_id = ? AND work_id = ?", (project_id, work_id), "created_at, id")
 
@@ -485,8 +525,41 @@ class SqliteWorkFileRepo(_Table[WorkFile]):
     def add(self, wf: WorkFile) -> WorkFile:
         return self._insert(wf)
 
+    def get(self, project_id: str, work_file_id: str) -> WorkFile:
+        return self._get(project_id, work_file_id)
+
     def list_for_work(self, project_id: str, work_id: str) -> list[WorkFile]:
         return self._select("project_id = ? AND work_id = ?", (project_id, work_id), "retrieved_at, id")
+
+
+class SqliteCitationFileRepo(_Table[CitationFile]):
+    table, model, key = "citation_file", CitationFile, "citation_file_id"
+
+    def _cols(self, m: CitationFile, d: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "project_id": m.project_id,
+            "occurrence_id": m.occurrence_id,
+            "target_doi": m.target_doi,
+            "citation_text_sha256": m.citation_text_sha256,
+            "sha256": m.sha256,
+            "state": d["state"],
+            "retrieved_at": iso(m.retrieved_at),
+        }
+
+    def add(self, file: CitationFile) -> CitationFile:
+        return self._insert(file)
+
+    def update(self, file: CitationFile) -> CitationFile:
+        self.get(file.project_id, file.citation_file_id)
+        return self._write(file)
+
+    def get(self, project_id: str, citation_file_id: str) -> CitationFile:
+        return self._get(project_id, citation_file_id)
+
+    def list_for_occurrence(self, project_id: str, occurrence_id: str) -> list[CitationFile]:
+        return self._select(
+            "project_id = ? AND occurrence_id = ?", (project_id, occurrence_id), "retrieved_at, id"
+        )
 
 
 class SqliteArtifactRepo(_Table[Artifact]):
@@ -511,6 +584,12 @@ class SqliteArtifactRepo(_Table[Artifact]):
     ) -> Page[Artifact]:
         sql = "SELECT id FROM artifact WHERE project_id = ? AND (? IS NULL OR kind = ?) ORDER BY id"
         return self._page(sql, (project_id, kind, kind), after, limit)
+
+    def list_global(
+        self, *, kind: str | None = None, after: str | None = None, limit: int = 25
+    ) -> Page[Artifact]:
+        sql = "SELECT id FROM artifact WHERE (? IS NULL OR kind = ?) ORDER BY created_at DESC, id DESC"
+        return self._page(sql, (kind, kind), after, limit)
 
 
 # ---------------------------------------------------------------- shared tier
@@ -556,6 +635,7 @@ class SqliteStore:
         self.access_checks = SqliteAccessCheckRepo(db)
         self.local_copies = SqliteLocalCopyRepo(db)
         self.work_files = SqliteWorkFileRepo(db)
+        self.citation_files = SqliteCitationFileRepo(db)
         self.artifacts = SqliteArtifactRepo(db)
         self.audit = SqliteAuditRepo(db)
         self.idempotency = SqliteIdempotencyRepo(db)

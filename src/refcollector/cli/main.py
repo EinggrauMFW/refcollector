@@ -34,6 +34,7 @@ from refcollector.cli import review as review_mod
 from refcollector.cli.render import echo
 from refcollector.config import (
     SECRET_NAMES,
+    config_lock,
     load_settings,
     save_settings,
     secrets_present,
@@ -981,15 +982,28 @@ class ServeTarget(StrEnum):
 
 @app.command("serve")
 @guard
-def serve(target: Annotated[ServeTarget | None, typer.Argument()] = None) -> None:
-    """Run the executor (no argument) or the MCP stdio server (mcp)."""
+def serve(
+    target: Annotated[ServeTarget | None, typer.Argument()] = None,
+    host: Annotated[str, typer.Option("--host", help="Host address to bind to.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", help="Port to listen on.")] = 8000,
+) -> None:
+    """Run the executor (no argument), the MCP stdio server (mcp), or the local web server (web)."""
     if target == ServeTarget.WEB:
-        raise FeatureNotAvailable(
-            "The web app is not part of P0 (decision D-05).",
-            recovery_hint=(
-                "Use the CLI or `refcollector serve mcp`. The v0.1 web app runs from legacy/webapp/."
-            ),
-        )
+        if not (1 <= port <= 65535):
+            raise InvalidInput(f"Invalid port {port}. Port must be between 1 and 65535.")
+        if host not in ("127.0.0.1", "localhost"):
+            raise InvalidInput(
+                "The web server only binds to 127.0.0.1 loopback (spec 7). Remote mode is prohibited."
+            )
+        try:
+            from refcollector.web.server import run_web
+        except ImportError as e:
+            raise FeatureNotAvailable(
+                "The web extra is not installed.",
+                recovery_hint="Install with: pip install refcollector[web]",
+            ) from e
+        run_web(load_settings(), host=host, port=port)
+        return
     if target == ServeTarget.MCP:
         try:
             from refcollector.mcp.server import run_stdio
@@ -1072,9 +1086,11 @@ def config_pdf_browser(
             raise typer.BadParameter("Chromium path must be an existing file")
         python_value, binary_value = str(python_file), str(binary_file)
     settings = load_settings()
-    settings.pdf_browser_python = python_value
-    settings.pdf_browser_binary = binary_value
-    save_settings(settings)
+    with config_lock(settings.rc_home):
+        settings = load_settings(settings.rc_home)
+        settings.pdf_browser_python = python_value
+        settings.pdf_browser_binary = binary_value
+        save_settings(settings)
     echo(f"PDF browser: {python_value or 'disabled'}")
 
 
@@ -1092,8 +1108,10 @@ def config_pdf_fallback(url_template: str) -> None:
             break
     value = None if selected == "off" else validate_template(selected)
     s = load_settings()
-    s.pdf_fallback_url = value
-    save_settings(s)
+    with config_lock(s.rc_home):
+        s = load_settings(s.rc_home)
+        s.pdf_fallback_url = value
+        save_settings(s)
     echo(f"PDF fallback: {value or 'disabled'}")
 
 
@@ -1104,8 +1122,10 @@ def config_set(key: str, value: str) -> None:
     if key != "email":
         raise typer.BadParameter(f"unknown setting {key!r}; supported: email", param_hint="KEY")
     s = load_settings()
-    s.email = value
-    save_settings(s)
+    with config_lock(s.rc_home):
+        s = load_settings(s.rc_home)
+        s.email = value
+        save_settings(s)
     echo(f"email set to {value}")
 
 
@@ -1115,9 +1135,11 @@ def config_allow_folder(path: str) -> None:
     """Allow imports and attachments from a folder (empty by default)."""
     folder = Path(path).expanduser().resolve()
     s = load_settings()
-    if folder not in s.allow_folders:
-        s.allow_folders.append(folder)
-        save_settings(s)
+    with config_lock(s.rc_home):
+        s = load_settings(s.rc_home)
+        if folder not in s.allow_folders:
+            s.allow_folders.append(folder)
+            save_settings(s)
     if not folder.is_dir():
         echo(f"warning: {folder} is not an existing folder", err=True)
     echo(f"allowed: {folder}")
@@ -1132,10 +1154,12 @@ def config_set_key(name: str) -> None:
             f"unknown key {name!r}; choose from {', '.join(SECRET_NAMES)}", param_hint="NAME"
         )
     value = typer.prompt(f"Value for {name}", hide_input=True)
-    try:
-        set_secret(name, value)
-    except KeyringError as e:
-        raise IntegrationUnavailable(f"The OS keyring refused the key: {e}") from e
+    s = load_settings()
+    with config_lock(s.rc_home):
+        try:
+            set_secret(name, value)
+        except KeyringError as e:
+            raise IntegrationUnavailable(f"The OS keyring refused the key: {e}") from e
     echo(f"{name} stored in the OS keyring")
 
 

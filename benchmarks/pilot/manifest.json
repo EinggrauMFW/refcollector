@@ -1,0 +1,1404 @@
+[
+  {
+    "document_id": "pilot-001",
+    "sha256": "fbe491eb65be33377ffffb09184daad3a99e8899d2946862a11ecf6545afd30f",
+    "pages": 18,
+    "split": "development",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://research.lut.fi/converis/portal/detail/Publication/23544417?lang=en_GB",
+    "redistribution_permission": "not_verified",
+    "prior_use": "known_live_test",
+    "reference_heading_pages_1based": [
+      16
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.1016/j.apenergy.2024.123119",
+      "https://research.lut.fi/converis/portal/detail/Publication/23544417?lang=en_GB"
+    ],
+    "first_page_doi_candidates": [
+      "10.1016/j.apenergy.2024.123119"
+    ],
+    "title_from_pdf": "Techno-economic assessment of global and regional wave energy resource potentials and profiles in hourly resolution",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.1016/j.apenergy.2024.123119",
+    "source_verification_status": "indexed_primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-002",
+    "sha256": "187aca03c35e688dc15b88f3b47dcdf8c4d30c68e754c4f4f7e06b0e5fec6570",
+    "pages": 56,
+    "split": "development",
+    "title_metadata_unverified": "Control mechanism of the flywheel on the gyroscopic-pendulum WEC",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://repository.tudelft.nl/record/uuid:711543f2-497c-4bfb-abd9-5dcef88d8786",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      55,
+      56
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://repository.tudelft.nl/record/uuid:711543f2-497c-4bfb-abd9-5dcef88d8786"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Power Efficiency of the Gyroscopic-Pendulum Wave Energy Converter",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "PDF metadata title differs from printed title. Primary repository supports the printed title. Reuse license unknown; no redistribution permission inferred."
+    ],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen",
+    "reference_heading_candidates_1based": [
+      10,
+      55,
+      56
+    ],
+    "bibliography_boundary_review": {
+      "status": "development_source_reviewed_not_gold",
+      "checked_date": "2026-10-22",
+      "method": "PDF text plus rendered page inspection",
+      "notes": "Physical page 10 is a table-of-contents entry. Bibliography begins on page 55; page 56 has a running Bibliography heading and continuation entries."
+    }
+  },
+  {
+    "document_id": "pilot-003",
+    "sha256": "197304c8753c91312b0871970cd5a3c116d61e31f2ef2ae63ce872dfadb1bc5f",
+    "pages": 78,
+    "split": "development",
+    "title_metadata_unverified": "Extreme wave conditions and the impact on wave energy converters",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://uu.diva-portal.org/smash/get/diva2%3A1546907/FULLTEXT01.pdf",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      73
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://uu.diva-portal.org/smash/get/diva2%3A1546907/FULLTEXT01.pdf"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Extreme wave conditions and the impact on wave energy converters",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_pdf_sha256_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-004",
+    "sha256": "2f4b50469aa704c783a51150c8cc63e0c4e00ed8ec19112ef7aeceea7df647a6",
+    "pages": 144,
+    "split": "development",
+    "title_metadata_unverified": "",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://tethys.pnnl.gov/sites/default/files/publications/Billarant_2019.pdf",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      117
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://skemman.is/handle/1946/34031",
+      "https://tethys.pnnl.gov/sites/default/files/publications/Billarant_2019.pdf"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "The Impact of Brexit on the Marine Renewable Energy Industry in the UK",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "",
+    "source_verification_status": "archived_pdf_full_normalized_text_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity."
+    ],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "downloaded_source_sha256": "698dd726ec981ec7d0c5b80279ae375271efae9a8b31f3af7e7956d9a0891753",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-006",
+    "sha256": "44e16cfea50b9a2165e3ae0ad4db98234ca2ab97eb4fb93de37c6c6ed61d10db",
+    "pages": 48,
+    "split": "evaluation",
+    "title_metadata_unverified": "Exjobbsframsida",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://tethys-engineering.pnnl.gov/sites/default/files/publications/Rahoor-2020-Thesis.pdf",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://tethys-engineering.pnnl.gov/sites/default/files/publications/Rahoor-2020-Thesis.pdf"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Comparison of Control Strategies for Wave Energy Converters",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "",
+    "source_verification_status": "archived_pdf_full_normalized_text_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-007",
+    "sha256": "460fc54afd81d0be27090a06acd0d355e302a510f0530a7d12673197857ff321",
+    "pages": 197,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://hull-repository.worktribe.com/output/5463406",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      143,
+      144,
+      145,
+      146,
+      147,
+      148,
+      149,
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      160,
+      161,
+      162,
+      163,
+      164,
+      165,
+      166,
+      167,
+      168,
+      169,
+      170,
+      171,
+      172,
+      173,
+      174,
+      175,
+      176,
+      177,
+      178,
+      179,
+      180,
+      181,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      188,
+      189,
+      190,
+      191,
+      192,
+      193,
+      194,
+      195,
+      196,
+      197
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://hull-repository.worktribe.com/output/5463406"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Analysing ocean wave data for improved planning of future offshore renewable energy",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "",
+    "source_verification_status": "indexed_primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity.",
+      "Repository spells the given name Viktoriia; PDF prints Victoria. Record both forms."
+    ],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-008",
+    "sha256": "4ab0143c45924602fc4b4c806c988028bb3b425c2dd5799bdf91326b87b63f27",
+    "pages": 233,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://era.ed.ac.uk/items/58dbff5a-6e6a-4779-ab4e-fd5284d1b14c",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      11,
+      99,
+      195,
+      196,
+      197,
+      198,
+      199,
+      200,
+      201,
+      202,
+      204
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://era.ed.ac.uk/items/58dbff5a-6e6a-4779-ab4e-fd5284d1b14c"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Enabling Tools for the Development of Marine Renewable Energy",
+    "title_evidence_page_1based": 2,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-009",
+    "sha256": "50abb54ec9260e7e4e12a04ca15aad5204eca2f0cd34ba6ca3216ee0a710e6dc",
+    "pages": 435,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://cora.ucc.ie/handle/10468/8197",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      414
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://hdl.handle.net/10468/8197",
+      "https://cora.ucc.ie/handle/10468/8197"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Data-driven analysis of reliability, accessibility and survivability in marine renewable energy projects",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "",
+    "source_verification_status": "indexed_primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity."
+    ],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-010",
+    "sha256": "54853dfe6c57c46eccdcffc181bb4710b38bdfb91464594d8a3531060362fb78",
+    "pages": 78,
+    "split": "evaluation",
+    "title_metadata_unverified": "Heuristic Optimization of Wave Energy Converter Arrays",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://conservancy.umn.edu/bitstreams/aae67b29-006b-40ef-8a48-35d2759ce79e/download",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      7,
+      75
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://conservancy.umn.edu/bitstreams/aae67b29-006b-40ef-8a48-35d2759ce79e/download"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Heuristic Optimization of Wave Energy Converter Arrays",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "",
+    "source_verification_status": "indexed_primary_pdf_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-011",
+    "sha256": "00ffe71d867b600b8183dba0bb625e89610baaaf8e6eb81320e432390bc692da",
+    "pages": 9,
+    "split": "development",
+    "title_metadata_unverified": "Conformal Prediction Algorithms for Time Series Forecasting: Methods and Benchmarking",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://arxiv.org/abs/2601.18509v2",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      8
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://arxiv.org/abs/2601.18509v2"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Conformal Prediction Algorithms for Time Series Forecasting: Methods and Benchmarking",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-012",
+    "sha256": "02e2bf9119ff6a9a8ca9c1d74cec449a2aca6045f6743bd4f9cbf42aa7692b15",
+    "pages": 15,
+    "split": "development",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://marineenergyjournal.org/imej/article/view/98",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      14
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.36688/imej.5.349-363",
+      "https://marineenergyjournal.org/imej/article/view/98"
+    ],
+    "first_page_doi_candidates": [
+      "10.36688/imej.5.349-363"
+    ],
+    "title_from_pdf": "Operations and maintenance optimisation for a 100 MW wave energy farm in Ireland",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.36688/imej.5.349-363",
+    "source_verification_status": "primary_record_title_and_author_match_doi_discrepancy",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity.",
+      "PDF prints DOI ending 349-363; publisher record and citation print 349-362. Preserve both; use the publisher record as source evidence."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "doi_from_primary_record": "10.36688/imej.5.349-362",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-013",
+    "sha256": "0c4e24531213879e936915c94cddd0ba8f25be72c274b9ee7be2608412dc082d",
+    "pages": 9,
+    "split": "development",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://submissions.ewtec.org/proc-ewtec/article/view/582",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      8
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.36688/ewtec-2023-582",
+      "https://submissions.ewtec.org/proc-ewtec/article/view/582"
+    ],
+    "first_page_doi_candidates": [
+      "10.36688/ewtec-2023-582"
+    ],
+    "title_from_pdf": "Hydrodynamic Response of Mocean Wave Energy Converter in Extreme Waves",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.36688/ewtec-2023-582",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-014",
+    "sha256": "0dc6d9477c1301bfe4e7297d3e53e81928a54354de18891c97d914039c6597ff",
+    "pages": 14,
+    "split": "development",
+    "title_metadata_unverified": "Site-Specific Parameterization of Ocean Spectra for Power Estimates of Wave Energy Converters",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://arxiv.org/abs/2507.05440v1",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      12
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://arxiv.org/abs/2507.05440v1"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Site-Specific Parameterization of Ocean Spectra for Power Estimates of Wave Energy Converters",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen",
+    "reference_heading_candidates_1based": [
+      1
+    ],
+    "bibliography_boundary_review": {
+      "status": "development_source_reviewed_not_gold",
+      "checked_date": "2026-10-22",
+      "method": "PDF text plus rendered page inspection",
+      "notes": "Physical page 1 contains a table-of-contents entry. Reference entries begin below the separator on physical page 12; no explicit References heading is printed at that boundary."
+    }
+  },
+  {
+    "document_id": "pilot-015",
+    "sha256": "105fe92ba7a08edaf461fdcb68fb8024bbc06496099d9c030a0daeba005a0c3d",
+    "pages": 36,
+    "split": "development",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11329864/",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      20,
+      23
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.12688/openreseurope.14854.2",
+      "https://pmc.ncbi.nlm.nih.gov/articles/PMC11329864/"
+    ],
+    "first_page_doi_candidates": [
+      "10.12688/openreseurope.14854.1",
+      "10.12688/openreseurope.14854.2"
+    ],
+    "title_from_pdf": "Experimental insights on biofouling growth in marine renewable structures",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.12688/openreseurope.14854.2",
+    "source_verification_status": "archived_article_title_author_version_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-016",
+    "sha256": "1e76cf5bc9284405ebdc72302acb67b52abe528dc57edf75b85e88f89d38ba21",
+    "pages": 16,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://www.frontiersin.org/journals/marine-science/articles/10.3389/fmars.2024.1385285/full",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      15
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.3389/fmars.2024.1385285",
+      "https://www.frontiersin.org/journals/marine-science/articles/10.3389/fmars.2024.1385285/full"
+    ],
+    "first_page_doi_candidates": [
+      "10.3389/fmars.2024.1385285"
+    ],
+    "title_from_pdf": "A worldwide coastal analysis of the climate wave systems",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.3389/fmars.2024.1385285",
+    "source_verification_status": "indexed_primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-017",
+    "sha256": "2263a55c876f6da01f179787873ef65591cec58851b6cb68bf20bac6f085dc44",
+    "pages": 10,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://submissions.ewtec.org/proc-ewtec/article/download/270/229",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      9
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.36688/ewtec-2023-270",
+      "https://submissions.ewtec.org/proc-ewtec/article/view/270",
+      "https://submissions.ewtec.org/proc-ewtec/article/download/270/229"
+    ],
+    "first_page_doi_candidates": [
+      "10.36688/ewtec-2023-270"
+    ],
+    "title_from_pdf": "Biofilm prevention in the generator of a direct drive wave energy converter",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.36688/ewtec-2023-270",
+    "source_verification_status": "primary_pdf_sha256_match_metadata_discrepancy",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Publisher record lists Nick Baker, Serkan Turkmen, Chang Li. PDF lists C. Li, S. Turkman, N. J. Baker, J. Finlay, E. Ryan. Preserve both; resolve version and author discrepancy before freezing.",
+      "Resolved document identity using publisher PDF: 2,225,434 bytes, SHA256 equals local source. Landing-page author metadata still differs; do not replace the PDF author list."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "publisher_pdf_sha256": "2263a55c876f6da01f179787873ef65591cec58851b6cb68bf20bac6f085dc44",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-018",
+    "sha256": "27c152c866cbcb655d699548420cd8a52770f3ad2ca2b4ce14ef3144bc809252",
+    "pages": 7,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://submissions.ewtec.org/proc-ewtec/article/view/315",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      7
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.36688/ewtec-2023-315",
+      "https://submissions.ewtec.org/proc-ewtec/article/view/315"
+    ],
+    "first_page_doi_candidates": [
+      "10.36688/ewtec-2023-315"
+    ],
+    "title_from_pdf": "Power quality assessment of a wave energy converter using energy storage",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.36688/ewtec-2023-315",
+    "source_verification_status": "primary_record_title_and_author_match_order_discrepancy",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity.",
+      "Publisher landing page and PDF list the same authors in different orders. Preserve PDF order for PDF transcription."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-019",
+    "sha256": "2a2a9285ada8b8dc548674b18ba615bd8c58f93aee03a9d5f79de016812deb1a",
+    "pages": 6,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://www.osti.gov/servlets/purl/3000685",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      5
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://www.sciencedirect.com/science/article/pii/S2405896324018494",
+      "https://www.osti.gov/servlets/purl/3000685"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Co-design of a wave energy converter for autonomous power",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "",
+    "source_verification_status": "archived_pdf_full_normalized_text_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "downloaded_source_sha256": "2a2a9285ada8b8dc548674b18ba615bd8c58f93aee03a9d5f79de016812deb1a",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-020",
+    "sha256": "2a4e12b294288d85c85bda7aec05d618ff20d44be69fefa430d4b1a11935e1d0",
+    "pages": 31,
+    "split": "evaluation",
+    "title_metadata_unverified": "Representing the Surface Ocean in ECMWF's data-driven forecasting system AIFS",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://arxiv.org/abs/2604.25559v1",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      20
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://arxiv.org/abs/2604.25559v1"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Representing the Surface Ocean in ECMWF's data-driven forecasting system AIFS",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-021",
+    "sha256": "38daaddd05e96e5b8ca774548491545a0f4a3f251b32e4281ba05f77cd6f885c",
+    "pages": 12,
+    "split": "evaluation",
+    "title_metadata_unverified": "The MBARI-WEC: a power source for ocean sensing",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://doi.org/10.1007/s40722-021-00197-9",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      12
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://doi.org/10.1007/s40722-021-00197-9"
+    ],
+    "first_page_doi_candidates": [
+      "10.1007/s40722-021-00197-9"
+    ],
+    "title_from_pdf": "The MBARI-WEC: a power source for ocean sensing",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "10.1007/s40722-021-00197-9",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-022",
+    "sha256": "5b9bc9b0ec7f07acfcf1004baac588ba77ad0b8f6cada6f60810cac790628b4a",
+    "pages": 10,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://submissions.ewtec.org/proc-ewtec/article/download/531/203",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      9
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.36688/ewtec-2023-531",
+      "https://submissions.ewtec.org/proc-ewtec/article/download/531/203"
+    ],
+    "first_page_doi_candidates": [
+      "10.13039/501100011033",
+      "10.36688/ewtec-2023-531"
+    ],
+    "title_from_pdf": "Wave energy converter array layout control co-design for different mooring configurations",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.36688/ewtec-2023-531",
+    "source_verification_status": "primary_pdf_sha256_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity.",
+      "First-page DOI 10.13039/501100011033 identifies a funder, not this work. Work DOI is 10.36688/ewtec-2023-531."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-023",
+    "sha256": "640b3b9c8284f78116aa6008b95381715724ed4bd158a4f030092616547f616b",
+    "pages": 28,
+    "split": "evaluation",
+    "title_metadata_unverified": "Impact of operations and maintenance on the energy production of floating offshore wind farms across the North Sea and the Iberian Peninsula",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://strathprints.strath.ac.uk/88272/",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      20
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://strathprints.strath.ac.uk/88272/"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Impact of Operations and Maintenance on the Energy Production of Floating Offshore Wind Farms Across the North Sea and the Iberian Peninsula",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "PDF spells James Carrol; repository spells James Carroll. Preserve the spelling difference for final annotation."
+    ],
+    "doi_from_primary_record": "10.1016/j.renene.2024.120217",
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-024",
+    "sha256": "7872bbc58d05d300f32caaa12bb8e499f9cf7584c31a956923410d34242796d8",
+    "pages": 13,
+    "split": "evaluation",
+    "title_metadata_unverified": "Advancing the HERO WEC Through Integrated Modeling, Testing, and Field Deployments: Preprint",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://research-hub.nlr.gov/en/publications/advancing-the-hero-wec-through-integrated-modeling-testing-and-fi/",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      13
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://research-hub.nlr.gov/en/publications/advancing-the-hero-wec-through-integrated-modeling-testing-and-fi/"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Advancing the HERO WEC Through Integrated Modeling, Testing, and Field Deployments",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-025",
+    "sha256": "7d343e1de10bcf957c28b217ca39428677f65a74fb72be7805270f1f3057d1c4",
+    "pages": 22,
+    "split": "evaluation",
+    "title_metadata_unverified": "Effective Self-Attention-Based Deep Learning Model with Evolutionary Grid Search for Robust Wave Farm Energy Forecasting",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://arxiv.org/abs/2507.09847v1",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      20
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://arxiv.org/abs/2507.09847v1"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Effective Self Attention-Based Deep Learning Model with Evolutionary Grid Search for Robust Wave Farm Energy Forecasting",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-026",
+    "sha256": "9547aab49a6332eef4e6c2517cbd1dc646a5f17bd20bbabe20fdeb7be7bfc407",
+    "pages": 13,
+    "split": "evaluation",
+    "title_metadata_unverified": "Microsoft Word - 10_JETS53012021_13055",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://journals.itb.ac.id/index.php/jets/article/view/13055",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      11
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.5614/j.eng.technol.sci.2021.53.1.10",
+      "https://journals.itb.ac.id/index.php/jets/article/view/13055"
+    ],
+    "first_page_doi_candidates": [
+      "10.5614/j.eng.technol.sci.2021.53.1.10"
+    ],
+    "title_from_pdf": "Extreme Significant Wave Height Map of Indonesia Based on SEAFINE and ERA5 Database",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.5614/j.eng.technol.sci.2021.53.1.10",
+    "source_verification_status": "primary_record_title_and_author_match_redirect_observed",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity.",
+      "PDF text is English. Indonesian geography and author affiliations do not establish Indonesian-language coverage.",
+      "Journal URL redirected to journal-itb.org. Record identity evidence only; no access or license conclusion follows."
+    ],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-027",
+    "sha256": "99279f1b7fd8d5855bcc30889022f667b143ef31732f899e56ea96a8f09c10a2",
+    "pages": 8,
+    "split": "evaluation",
+    "title_metadata_unverified": "Southern-latitude wind forcing as a predictor of swell energy and coastal wave power in Peru",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://www.frontiersin.org/journals/marine-science/articles/10.3389/fmars.2026.1779394/full",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      7
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.3389/fmars.2026.1779394",
+      "https://www.frontiersin.org/journals/marine-science/articles/10.3389/fmars.2026.1779394/full"
+    ],
+    "first_page_doi_candidates": [
+      "10.3389/fmars.2026.1779394"
+    ],
+    "title_from_pdf": "Southern-latitude wind forcing as a predictor of swell energy and coastal wave power in Peru",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.3389/fmars.2026.1779394",
+    "source_verification_status": "indexed_primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-028",
+    "sha256": "9ad83aa90832dca679474e5f4aac9bcef10a0de255688c8dfa37ba51200576a9",
+    "pages": 9,
+    "split": "evaluation",
+    "title_metadata_unverified": "Wave energy converter buoy for Arctic observations",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://www.pnnl.gov/publications/wave-energy-converter-buoy-arctic-observations",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      9
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.1016/j.renene.2025.123497",
+      "https://www.pnnl.gov/publications/wave-energy-converter-buoy-arctic-observations"
+    ],
+    "first_page_doi_candidates": [
+      "10.1016/j.renene.2025.123497"
+    ],
+    "title_from_pdf": "Wave energy converter buoy for Arctic observations",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.1016/j.renene.2025.123497",
+    "source_verification_status": "indexed_author_institution_record_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-029",
+    "sha256": "9e5963b8fb39f4b3bb6ff5f60a049ebb124a69ee1019f400219baf52741377a0",
+    "pages": 33,
+    "split": "evaluation",
+    "title_metadata_unverified": "PacWave Anchoring and Mooring Study",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://research-hub.nlr.gov/en/publications/pacwave-anchoring-and-mooring-study/",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      31
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [
+      "https://research-hub.nlr.gov/en/publications/pacwave-anchoring-and-mooring-study/"
+    ],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "PacWave Anchoring and Mooring Study",
+    "title_evidence_page_1based": 1,
+    "identity_status": "primary_record_matched_not_gold_annotation",
+    "doi_from_pdf": "",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "doi_from_primary_record": "10.2172/1996224",
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-030",
+    "sha256": "a4b249ca5ef70fc3ead51813786e1bfd2d58320cac95c293c39e4474152dbe83",
+    "pages": 12,
+    "split": "evaluation",
+    "title_metadata_unverified": "Wave Energy Converter Power Take-Off Modeling and Validation From Experimental Bench Tests",
+    "cohort": "multi_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "https://www.sandia.gov/research/publications/details/wave-energy-converter-power-take-off-modeling-and-validation-from-experimen-2024-04-01/",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      11
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "source_evidence_recorded",
+    "source_url_candidates": [
+      "https://doi.org/10.1109/JOE.2023.3345903",
+      "https://www.sandia.gov/research/publications/details/wave-energy-converter-power-take-off-modeling-and-validation-from-experimen-2024-04-01/"
+    ],
+    "first_page_doi_candidates": [
+      "10.1109/JOE.2023.3345903"
+    ],
+    "title_from_pdf": "Wave Energy Converter Power Take-Off Modeling and Validation From Experimental Bench Tests",
+    "title_evidence_page_1based": 1,
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "doi_from_pdf": "10.1109/JOE.2023.3345903",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [
+      "Primary URL fetch failed or was unavailable through the web tool. This does not establish an access restriction or invalid identity."
+    ],
+    "cohort_tags": [
+      "multi_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-031",
+    "sha256": "33a6d94f3f4df864113344f80f5fdf7a02a99b8940cabb5a2f0b258f3ee0b53f",
+    "pages": 10,
+    "split": "development",
+    "title_metadata_unverified": "",
+    "title_from_pdf": "PEMODELAN TINGGI GELOMBANG UNTUK KAJIAN ENERGI GELOMBANG LAUT DI PERAIRAN BARAT PROVINSI LAMPUNG",
+    "title_evidence_page_1based": 1,
+    "cohort": "multi_column_sampled",
+    "cohort_tags": [
+      "multi_column",
+      "indonesian_language"
+    ],
+    "cohort_status": "sampled_layout_and_language_inspected",
+    "chapter_bibliographies": "not_applicable",
+    "annotation_status": "not_started",
+    "source_url": "https://ejournal.brin.go.id/jurnalwave/article/view/2305",
+    "source_url_candidates": [
+      "https://ejournal.brin.go.id/jurnalwave/article/view/2305"
+    ],
+    "source_verification_status": "primary_pdf_title_and_author_match",
+    "redistribution_permission": "not_verified",
+    "prior_use": "newly_acquired_for_this_packet_not_used_for_tuning",
+    "reference_heading_pages_1based": [
+      7
+    ],
+    "language_sampled": "id",
+    "text_page_coverage": 1.0,
+    "benchmark_tier": "P0_candidate",
+    "provenance_checked_date": "2026-10-22",
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "provenance_status": "source_evidence_recorded",
+    "provenance_notes": [
+      "Indonesian body text and two-column layout visually inspected. Publisher displays CC BY-NC-SA 4.0; no PDFs are included in tracked files."
+    ],
+    "split_status": "provisional_not_frozen",
+    "reference_heading_candidates_1based": [
+      8
+    ],
+    "bibliography_boundary_review": {
+      "status": "development_source_reviewed_not_gold",
+      "checked_date": "2026-10-22",
+      "method": "PDF text plus rendered page inspection",
+      "notes": "DAFTAR PUSTAKA begins near the bottom of the right column on physical page 7. Page 8 continues the first entry."
+    }
+  },
+  {
+    "document_id": "pilot-032",
+    "sha256": "26fa1d999dc7c5854d1291fa7117ecc32c396fbcd65d3c56cfa7cee6a1a13dd5",
+    "pages": 8,
+    "split": "evaluation",
+    "title_metadata_unverified": "",
+    "title_from_pdf": "PERSAMAAN ENERGI UNTUK PERHITUNGAN DAN PEMETAAN AREA YANG BERPOTENSI UNTUK PENGEMBANGAN PEMBANGKIT LISTRIK TENAGA GELOMBANG LAUT",
+    "title_evidence_page_1based": 1,
+    "cohort": "multi_column_sampled",
+    "cohort_tags": [
+      "multi_column",
+      "indonesian_language"
+    ],
+    "cohort_status": "sampled_layout_and_language_inspected",
+    "chapter_bibliographies": "not_applicable",
+    "annotation_status": "not_started",
+    "source_url": "https://ejournal.brin.go.id/jurnalwave/article/view/11465",
+    "source_url_candidates": [
+      "https://ejournal.brin.go.id/jurnalwave/article/view/11465"
+    ],
+    "source_verification_status": "primary_pdf_title_and_author_match",
+    "redistribution_permission": "not_verified",
+    "prior_use": "newly_acquired_for_this_packet_not_used_for_tuning",
+    "reference_heading_pages_1based": [
+      7
+    ],
+    "language_sampled": "id",
+    "text_page_coverage": 1.0,
+    "benchmark_tier": "P0_candidate",
+    "provenance_checked_date": "2026-10-22",
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "provenance_status": "source_evidence_recorded",
+    "provenance_notes": [
+      "Indonesian body text and two-column layout visually inspected. Publisher displays CC BY-NC-SA 4.0; no PDFs are included in tracked files."
+    ],
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-033",
+    "sha256": "e9f075f6d686031c1e8ae9d87a5c8b4b035cfba7bfd90d899276e7b355022f30",
+    "pages": 140,
+    "split": "development",
+    "title_metadata_unverified": "",
+    "title_from_pdf": "On theory and simulation of heaving-buoy wave-energy converters with control",
+    "title_evidence_page_1based": 1,
+    "cohort": "scanned_with_existing_ocr",
+    "cohort_tags": [
+      "scanned_with_existing_ocr",
+      "multiple_manuscript_bibliographies"
+    ],
+    "cohort_status": "sampled_layout_and_language_inspected",
+    "chapter_bibliographies": "multiple_manuscript_lists_confirmed",
+    "annotation_status": "not_started",
+    "source_url": "https://www.osti.gov/etdeweb/servlets/purl/497635",
+    "source_url_candidates": [
+      "https://www.osti.gov/etdeweb/servlets/purl/497635"
+    ],
+    "source_verification_status": "primary_archive_pdf_inspected",
+    "redistribution_permission": "not_verified",
+    "prior_use": "newly_acquired_for_this_packet_not_used_for_tuning",
+    "reference_heading_pages_1based": [
+      32,
+      68,
+      86,
+      137
+    ],
+    "language_sampled": "en",
+    "text_page_coverage": 0.9785714285714285,
+    "benchmark_tier": "P1_supplement_existing_ocr_only",
+    "provenance_checked_date": "2026-10-22",
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "provenance_status": "source_evidence_recorded",
+    "provenance_notes": [
+      "Scan has full-page raster images on all 140 pages and an existing OCR text layer. It does not test generation of OCR from image-only pages."
+    ],
+    "split_status": "provisional_not_frozen"
+  },
+  {
+    "document_id": "pilot-034",
+    "sha256": "b6ac99137ccbf9a743434c06b63b65af33c2927490cb254adc4b5e82474015b5",
+    "pages": 186,
+    "split": "development",
+    "split_status": "provisional_not_frozen",
+    "title_metadata_unverified": "",
+    "title_from_pdf": "Techno-financial assessment of offshore hybrid renewable energy systems: The performance of wave energy converter arrays and the sizing of renewable energy systems including generation and storage subsystems",
+    "title_evidence_page_1based": 1,
+    "cohort": "single_column_sampled",
+    "cohort_tags": [
+      "single_column",
+      "chapter_bibliographies"
+    ],
+    "cohort_status": "sampled_chapter_bibliographies_visually_confirmed",
+    "chapter_bibliographies": "confirmed_sampled_chapters_1_2_3_4",
+    "annotation_status": "not_started",
+    "source_url": "https://research.rug.nl/en/publications/d3c104c9-7aae-4524-a7e5-f7e0ffd6bd00",
+    "source_url_candidates": [
+      "https://research.rug.nl/en/publications/d3c104c9-7aae-4524-a7e5-f7e0ffd6bd00",
+      "https://doi.org/10.33612/diss.975504514"
+    ],
+    "doi_from_pdf": "10.33612/diss.975504514",
+    "source_verification_status": "primary_record_title_and_author_match",
+    "redistribution_permission": "not_verified",
+    "prior_use": "used_to_debug_blank_separator_handling",
+    "reference_heading_pages_1based": [
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      65,
+      66,
+      67,
+      68,
+      69,
+      89,
+      90,
+      108,
+      109,
+      110,
+      133,
+      134,
+      135,
+      136,
+      167,
+      168,
+      169,
+      176,
+      177,
+      180,
+      181
+    ],
+    "benchmark_tier": "P0_candidate",
+    "provenance_checked_date": "2026-10-22",
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "provenance_status": "source_evidence_recorded",
+    "provenance_notes": [
+      "Publisher record identifies Alva Bechlenberg, 2024. Chapter-specific reference lists visually confirmed on physical pages 36, 65, 89, and 108. Full bibliography boundaries require annotation. Prior development exposure remains unknown.",
+      "Moved to development after this document reproduced the blank-separator OCR_REQUIRED defect. Must not remain in evaluation. After the fix it produces draft entries; completeness is not established."
+    ]
+  },
+  {
+    "document_id": "pilot-035",
+    "sha256": "e872a5e41065c017a74bff662a4814801c932cddb4de8d511e18c60d3c7884de",
+    "pages": 186,
+    "split": "evaluation",
+    "split_status": "provisional_not_frozen",
+    "title_metadata_unverified": "",
+    "title_from_pdf": "Analysis of the Use of the Wave Energy Resource in Galicia: Current Situation and Future Perspectives",
+    "title_evidence_page_1based": 1,
+    "authors_from_pdf": [
+      "Beatriz Arguilé Pérez"
+    ],
+    "year_on_pdf": 2025,
+    "defense_year_primary_record": 2026,
+    "cohort": "mixed_layout_sampled",
+    "cohort_tags": [
+      "mixed_layout",
+      "chapter_bibliographies"
+    ],
+    "cohort_status": "separate_embedded_article_bibliographies_visually_confirmed",
+    "chapter_bibliographies": "confirmed_multiple_article_lists_sampled_pages_71_and_91",
+    "annotation_status": "not_started",
+    "extraction_status": "withheld_until_split_freeze",
+    "source_url": "https://portalcientifico.uvigo.gal/documentos/69e670b365fce81e05e9c45a",
+    "source_url_candidates": [
+      "https://portalcientifico.uvigo.gal/documentos/69e670b365fce81e05e9c45a",
+      "https://hdl.handle.net/11093/11376"
+    ],
+    "source_verification_status": "primary_record_title_and_author_match",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited_no_refcollector_extraction_in_this_review",
+    "benchmark_tier": "P0_candidate",
+    "provenance_checked_date": "2026-10-22",
+    "identity_status": "document_identity_supported_not_reference_gold",
+    "provenance_status": "source_evidence_recorded",
+    "reference_heading_pages_1based": [
+      42,
+      71,
+      91,
+      100,
+      108,
+      115,
+      126,
+      147,
+      169
+    ],
+    "visually_confirmed_reference_list_pages_1based": [
+      71,
+      91
+    ],
+    "provenance_notes": [
+      "PDF cover prints 2025; university record gives defense date 27 January 2026. Preserve both dates.",
+      "Physical page 42 contains a table column labeled References, not a confirmed bibliography. Heading candidates are not gold section boundaries.",
+      "Physical pages 71 and 91 show separate article reference lists in a compilation thesis. Layout varies by chapter.",
+      "Only identity/layout inspection occurred in this review. Do not run RefCollector extraction or use output for tuning before split approval. Earlier use remains unknown."
+    ]
+  }
+]

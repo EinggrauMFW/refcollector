@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from typing import Any, Literal
 
 from refcollector import ids
-from refcollector.contracts.ports import StepSpec
+from refcollector.contracts.ports import Page, StepSpec
 from refcollector.domain.enums import TERMINAL_JOB_STATES, JobState, StepState, StepType
 from refcollector.domain.models import Job, Step, utcnow
 from refcollector.errors import InvalidState, NotFound
@@ -135,6 +135,39 @@ class SqliteJobQueue:
             (project_id, limit),
         )
         return [Job.model_validate_json(r["data"]) for r in rows]
+
+    def list_all_jobs(
+        self,
+        *,
+        project_id: str | None = None,
+        states: Sequence[JobState] | None = None,
+        after: str | None = None,
+        limit: int = 25,
+    ) -> Page[Job]:
+        where: list[str] = []
+        params: list[Any] = []
+        if project_id is not None:
+            where.append("project_id = ?")
+            params.append(project_id)
+        if states:
+            marks = ",".join("?" * len(states))
+            where.append(f"state IN ({marks})")
+            params.extend(s.value for s in states)
+        clause = f"WHERE {' AND '.join(where)}" if where else ""
+        sql = f"SELECT id FROM job {clause} ORDER BY created_at DESC, id DESC"  # noqa: S608
+        ids = [r[0] for r in self.db.query(sql, params)]
+        start = ids.index(after) + 1 if after in ids else 0
+        chunk = ids[start : start + limit]
+        if not chunk:
+            return Page([], None, len(ids))
+        placeholders = ",".join("?" * len(chunk))
+        rows = self.db.query(
+            f"SELECT id, data FROM job WHERE id IN ({placeholders})",  # noqa: S608
+            chunk,
+        )
+        by_id = {r[0]: Job.model_validate_json(r[1]) for r in rows}
+        more = start + limit < len(ids)
+        return Page([by_id[i] for i in chunk], chunk[-1] if more and chunk else None, len(ids))
 
     def jobs_in(self, states: Sequence[JobState]) -> list[Job]:
         marks = ",".join("?" * len(states))

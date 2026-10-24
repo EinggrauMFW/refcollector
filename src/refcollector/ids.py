@@ -20,6 +20,7 @@ PREFIXES = {
     "location": "loc",
     "local_copy": "lcp",
     "work_file": "wfl",
+    "citation_file": "cfl",
     "artifact": "art",
     "job": "job",
     "step": "stp",

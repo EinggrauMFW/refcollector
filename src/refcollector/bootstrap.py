@@ -156,6 +156,7 @@ def open_app(settings: Settings) -> AppHandle:
             max_concurrency=1,
         )
         executor.providers = providers
+        service.executor = executor
         return AppHandle(settings, db, store, service, executor)
     except BaseException:
         if files:

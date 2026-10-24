@@ -16,7 +16,14 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from refcollector.config import Limits
-from refcollector.contracts.ports import FileStore, FileVerifier, HttpClient, NetGuard, RetrievalOutcome
+from refcollector.contracts.ports import (
+    FileStore,
+    FileVerifier,
+    HttpClient,
+    NetGuard,
+    PdfRetrievalOutcome,
+    RetrievalOutcome,
+)
 from refcollector.domain.enums import RetrievalState
 from refcollector.domain.models import AccessLocation, ProjectWork, WorkFile, WorkMetadata
 from refcollector.errors import (
@@ -103,15 +110,46 @@ class DefaultRetriever:
         if project_id != work.project_id:
             error = NotAuthorized("Work belongs to another project")
             return RetrievalOutcome(RetrievalState.FAILED, None, [], error.to_payload())
+        metadata = effective_metadata(work)
+        result = await self.retrieve_pdf(
+            project_id, metadata, locations, http=http, is_cancelled=is_cancelled
+        )
+        wf = None
+        if result.blob is not None:
+            wf = WorkFile(
+                work_file_id=new_id("work_file"),
+                project_id=project_id,
+                work_id=work.work_id,
+                sha256=result.blob.sha256,
+                bytes=result.blob.bytes,
+                source_url=result.source_url,
+                final_url=result.final_url,
+                location_id=result.location_id,
+                state=result.state,
+                reasons=result.reasons,
+                export_name=export_file_name(metadata),
+            )
+        return RetrievalOutcome(result.state, wf, result.reasons, result.error)
+
+    async def retrieve_pdf(
+        self,
+        project_id: str,
+        metadata: WorkMetadata,
+        locations: Sequence[AccessLocation],
+        *,
+        http: HttpClient,
+        is_cancelled: Callable[[], bool],
+    ) -> PdfRetrievalOutcome:
+        """Use the same bounded transport and verifier for either ownership record."""
+        _cancel(is_cancelled)
         eligible = [location for location in locations if location.eligible]
         if not eligible:
             error = PrerequisiteNotMet("No eligible retrieval locations")
-            return RetrievalOutcome(RetrievalState.FAILED, None, [], error.to_payload())
+            return PdfRetrievalOutcome(RetrievalState.FAILED, None, [], error.to_payload())
         try:
             self._connection_policy(http)
         except RcError as exc:
-            return RetrievalOutcome(RetrievalState.FAILED, None, [], exc.to_payload())
-        metadata = effective_metadata(work)
+            return PdfRetrievalOutcome(RetrievalState.FAILED, None, [], exc.to_payload())
         failures = []
         last_error: RcError = FileValidationFailed("No valid PDF was retrieved")
         for location in eligible:
@@ -152,20 +190,20 @@ class DefaultRetriever:
                         )
                     blob = await _in_thread(self._files.commit, tmp, "application/pdf")
                     self._files.grant(project_id, blob.sha256)
-                    wf = WorkFile(
-                        work_file_id=new_id("work_file"),
-                        project_id=project_id,
-                        work_id=work.work_id,
-                        sha256=blob.sha256,
-                        bytes=blob.bytes,
+                    return PdfRetrievalOutcome(
+                        verification.state,
+                        blob,
+                        verification.reasons,
                         source_url=location.url,
                         final_url=result.final_url,
                         location_id=location.location_id,
-                        state=verification.state,
-                        reasons=verification.reasons,
-                        export_name=export_file_name(metadata),
+                        verification_evidence={
+                            **verification.evidence,
+                            "readable": verification.readable,
+                            "identity_match": verification.identity_match,
+                            "version": verification.version.value,
+                        },
                     )
-                    return RetrievalOutcome(verification.state, wf, verification.reasons)
             except Cancelled:
                 raise
             except (TimeoutError, OSError) as exc:
@@ -178,4 +216,4 @@ class DefaultRetriever:
             finally:
                 tmp.unlink(missing_ok=True)  # noqa: ASYNC240 - cleanup must survive cancellation
             failures.append(f"{location.location_id}: {last_error.code.value}")
-        return RetrievalOutcome(RetrievalState.FAILED, None, failures, last_error.to_payload())
+        return PdfRetrievalOutcome(RetrievalState.FAILED, None, failures, last_error.to_payload())

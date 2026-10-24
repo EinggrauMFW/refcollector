@@ -9,11 +9,12 @@ fields, so `origin`, `channel` or `approval` in arguments fail validation with I
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Annotated, Any, Literal, Protocol
+from typing import Annotated, Any, BinaryIO, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from refcollector.domain.enums import (
     AccessClassification,
@@ -27,6 +28,7 @@ from refcollector.domain.enums import (
     JobState,
     LocalCopyCheck,
     LocalCopyState,
+    NetworkMode,
     PolicyProfile,
     RetrievalState,
     Scope,
@@ -71,19 +73,50 @@ def _reject_p1(values: Any, field_name: str, p1: frozenset[str]) -> None:
 
 
 @dataclass(frozen=True)
+class ReviewGrant:
+    token: str
+    web_session_id: str
+    project_id: str
+    occurrence_id: str
+    candidate_id: str
+    action: str
+    expected_revision: int
+    expires_at: datetime
+    fingerprint: str
+
+
+@dataclass(frozen=True)
+class SettingsGrant:
+    token: str
+    web_session_id: str
+    expected_settings_revision: str
+    expires_at: datetime
+    fingerprint: str
+
+
+@dataclass(frozen=True)
 class CallContext:
     principal: str  # local OS user in P0
     channel: Channel
     scopes: frozenset[Scope]
     request_id: str
     tty: bool = False  # True only for `refcollector review` on a real terminal
+    web_session_id: str | None = None
+    review_grant: ReviewGrant | None = None
+    settings_grant: SettingsGrant | None = None
 
     @property
     def origin(self) -> str:
-        """7.4: MCP and non-interactive CLI are `agent`; TTY review is `interactive`."""
+        """7.4: MCP and non-interactive CLI are `agent`; TTY review and
+        confirmed web review are `interactive`.
+        """
         if self.channel == Channel.EXECUTOR:
             return "automation"
-        return "interactive" if self.channel == Channel.CLI_TTY_REVIEW and self.tty else "agent"
+        if self.channel == Channel.CLI_TTY_REVIEW and self.tty:
+            return "interactive"
+        if self.channel == Channel.WEB_UI and self.review_grant is not None:
+            return "interactive"
+        return "agent"
 
 
 class Meta(Dto):
@@ -137,6 +170,11 @@ class OccurrenceSummary(Dto):
     local_copy: LocalCopyState
     retrieval: RetrievalState
     warnings: list[str] = Field(default_factory=list)
+    order: float = 0.0
+    work_id: str | None = None
+    citation_doi: str | None = None
+    citation_file_id: str | None = None
+    citation_file_state: RetrievalState | None = None
 
 
 class CandidateView(Dto):
@@ -158,6 +196,8 @@ class StageCounts(Dto):
     failed_retryable: int = 0
     failed_permanent: int = 0
     skipped: int = 0
+    retry_wait: int = 0
+    cancelled: int = 0
 
 
 class JobSummary(Dto):
@@ -232,6 +272,39 @@ class GetProjectIn(Dto):
     project_id: str
 
 
+class RenameProjectIn(Dto):
+    project_id: str
+    name: Annotated[str, Field(min_length=1, max_length=200)]
+    idempotency_key: IdempotencyKey | None = None
+
+
+class RenameProjectOut(Out):
+    project_id: str
+    name: str
+    revision: int
+
+
+class GetProjectConsequencesIn(Dto):
+    project_id: str
+
+
+class GetProjectConsequencesOut(Out):
+    project_id: str
+    name: str
+    paper_count: int
+    citation_count: int
+    has_active_jobs: bool
+
+
+class DeleteProjectIn(Dto):
+    project_id: str
+    idempotency_key: IdempotencyKey | None = None
+
+
+class DeleteProjectOut(Out):
+    project_id: str
+
+
 class GetProjectOut(Out):
     project_id: str
     name: str
@@ -242,6 +315,7 @@ class GetProjectOut(Out):
     sources_count: int
     recent_jobs: list[JobSummary]
     recent_artifacts: list[ArtifactDescriptor]
+    download_enabled: bool = False
 
 
 # ---------- 5-8 sources ----------
@@ -292,6 +366,7 @@ class SourceListItem(Dto):
     extraction_state: ExtractionState
     occurrence_count: int
     imported_at: datetime
+    sha256: str | None = None
 
 
 class ListSourcesOut(Out):
@@ -403,6 +478,41 @@ class ControlJobOut(Out):
     state: JobState
 
 
+class ListJobsIn(Dto):
+    project_id: str | None = None
+    states: list[JobState] | None = None
+    cursor: str | None = None
+    limit: Limit | None = None
+
+
+class JobListItem(Dto):
+    project_id: str
+    project_name: str
+    job_id: str
+    state: JobState
+    stages: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ListJobsOut(Out):
+    jobs: list[JobListItem]
+    next_cursor: str | None = None
+
+
+class GetExecutorStatusIn(Dto):
+    pass
+
+
+class GetExecutorStatusOut(Out):
+    state: Literal["owned", "unowned", "stale", "unknown"]
+    owner_id: str | None = None
+    owner_pid: int | None = None
+    heartbeat_at: datetime | None = None
+    observed_at: datetime
+    is_local_owner: bool = False
+
+
 # ---------- 12-15 references ----------
 
 
@@ -413,9 +523,16 @@ class ReferenceFilter(Dto):
     identity: IdentityState | None = None
     discovery: DiscoveryState | None = None
     classification: AccessClassification | None = None
+    classification_is_null: bool | None = None
     local_copy: LocalCopyState | None = None
     retrieval: RetrievalState | None = None
     reason: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_classification(self) -> ReferenceFilter:
+        if self.classification is not None and self.classification_is_null is not None:
+            raise ValueError("classification and classification_is_null cannot both be set")
+        return self
 
 
 class ListReferencesIn(Dto):
@@ -434,7 +551,9 @@ class ListReferencesOut(Out):
     total: int
 
 
-ReferenceSection = Literal["candidates", "evidence", "access", "local_copies", "files", "history"]
+ReferenceSection = Literal[
+    "candidates", "evidence", "access", "local_copies", "files", "history", "citation_files"
+]
 
 
 class GetReferenceIn(Dto):
@@ -453,6 +572,7 @@ class GetReferenceOut(Out):
     local_copies: list[dict[str, Any]] | None = None
     files: list[dict[str, Any]] | None = None
     history: list[dict[str, Any]] | None = None  # audit events and decisions
+    citation_files: list[dict[str, Any]] | None = None
 
 
 class AddReferenceIn(Dto):
@@ -642,6 +762,7 @@ class DownloadFilesIn(Dto):
     version_policy: VersionPolicy | None = None
     budget: DownloadBudget | None = None
     idempotency_key: IdempotencyKey
+    retrieval_basis: Literal["accepted_work", "citation_doi"] = "accepted_work"
 
 
 class JobOut(Out):
@@ -704,6 +825,122 @@ class ReadArtifactOut(Out):
     descriptor: ArtifactDescriptor
     text: str | None = None
     eof: bool | None = None
+    next_offset: int | None = None
+
+
+class ListGlobalArtifactsIn(Dto):
+    kind: str | None = None
+    cursor: str | None = None
+    limit: Limit | None = None
+
+
+class GlobalArtifactItem(Dto):
+    project_id: str
+    project_name: str
+    descriptor: ArtifactDescriptor
+
+
+class ListGlobalArtifactsOut(Out):
+    artifacts: list[GlobalArtifactItem]
+    next_cursor: str | None = None
+
+
+class ReadProjectFileIn(Dto):
+    project_id: str
+    kind: Literal["source", "work_file", "artifact", "local_copy", "citation_file"]
+    resource_id: str
+    offset: Annotated[int, Field(ge=0)] = 0
+    length: Annotated[int, Field(ge=1, le=65536)] = 65536
+
+
+class ProjectFileDescriptor(Dto):
+    resource_id: str
+    kind: Literal["source", "work_file", "artifact", "local_copy", "citation_file"]
+    name: str
+    media_type: str
+    bytes: int
+    sha256: str
+
+
+class ReadProjectFileOut(Out):
+    descriptor: ProjectFileDescriptor
+    data: bytes
+    next_offset: int
+    eof: bool
+
+
+class UploadPdfIn(Dto):
+    project_id: str
+    purpose: Literal["source", "local_copy"]
+    name: Annotated[str, Field(min_length=1, max_length=255)]
+    declared_bytes: Annotated[int, Field(ge=0)]
+    occurrence_id: str | None = None
+    version_hint: CopyVersion | None = None
+    idempotency_key: IdempotencyKey
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v: str) -> str:
+        s = v.strip()
+        if not s:
+            raise ValueError("name cannot be empty or blank")
+        if "/" in v or "\\" in v:
+            raise ValueError("name must not contain path separators")
+        if ".." in v or v in (".", ".."):
+            raise ValueError("name must not contain path traversal")
+        if any(ord(c) < 32 or ord(c) == 127 for c in v):
+            raise ValueError("name must not contain control characters")
+        return v
+
+
+class UploadPdfOut(Out):
+    source: ImportSourceOut | None = None
+    attachment: AttachFileOut | None = None
+
+    @model_validator(mode="after")
+    def _validate_branch(self) -> UploadPdfOut:
+        if (self.source is None) == (self.attachment is None):
+            raise ValueError("Exactly one of source or attachment must be set")
+        return self
+
+
+class RenderSourcePageIn(Dto):
+    project_id: str
+    source_id: str
+    page_index: Annotated[int, Field(ge=0)]
+    scale: Annotated[float, Field(ge=0.5, le=2.0)] = 1.0
+
+    @field_validator("scale")
+    @classmethod
+    def _validate_scale(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("scale must be a finite float")
+        return v
+
+
+class RenderSourcePageOut(Out):
+    """Rendered source PDF page raster PNG.
+
+    Coordinates and overlay support:
+    PyMuPDF user coordinates for page.rect account for page rotation
+    (page.rotation in {0, 90, 180, 270}). The extraction adapter
+    (extraction/layout.py) normalizes unrotated text bboxes relative to
+    page.rect dimensions. On unrotated pages (rotation == 0), normalized
+    bounding boxes [x0, y0, x1, y1] map directly to raster pixel coordinates:
+        px0 = x0 * width
+        py0 = y0 * height
+        pw  = (x1 - x0) * width
+        ph  = (y1 - y0) * height
+    On rotated pages, direct visual overlay is not supported;
+    `span_overlay_supported` is set to False to report this limitation.
+    """
+
+    data: bytes
+    media_type: Literal["image/png"] = "image/png"
+    page_index: int
+    width: int
+    height: int
+    span_overlay_supported: bool = True
 
 
 # ---------- non-tool service calls (CLI only) ----------
@@ -732,6 +969,116 @@ class ReviewDecisionIn(Dto):
     idempotency_key: IdempotencyKey
 
 
+class ReviewFileDecisionIn(Dto):
+    project_id: str
+    occurrence_id: str
+    work_file_id: str
+    action: Literal["approve", "reject"]
+    expected_revision: int  # occurrence revision
+    note: str | None = None
+    idempotency_key: IdempotencyKey
+    file_kind: Literal["work_file", "citation_file"] = "work_file"
+
+
+class ReviewFileDecisionOut(Out):
+    occurrence_id: str
+    work_file_id: str
+    retrieval: RetrievalState
+    revision: int
+
+
+# ---------- Web Wave 3: trusted review and settings ----------
+
+
+class GetSettingsIn(Dto):
+    project_id: str | None = None
+
+
+class BrowserStatus(Dto):
+    enabled: bool
+    configured: bool
+
+
+class ProjectSettingsView(Dto):
+    project_id: str
+    network_mode: NetworkMode
+    download_enabled: bool
+    version_policy: VersionPolicy
+
+
+class GetSettingsOut(Out):
+    revision: str
+    rc_home: str
+    email: str | None
+    allow_folders: list[str]
+    download_enabled_global: bool
+    pdf_fallback_url: str | None
+    browser: BrowserStatus
+    enabled_providers: list[str]
+    mcp_scopes: list[str]
+    limits: dict[str, int | float]
+    keys: dict[str, bool]
+    project: ProjectSettingsView | None
+    warnings: list[str] = Field(default_factory=list)
+
+
+class SetEmailChange(Dto):
+    type: Literal["set_email"] = "set_email"
+    value: str
+
+
+class AddAllowedFolderChange(Dto):
+    type: Literal["add_allowed_folder"] = "add_allowed_folder"
+    path: str
+
+
+class SetProviderKeyChange(Dto):
+    type: Literal["set_provider_key"] = "set_provider_key"
+    provider: Literal["openalex_key", "s2_key"]
+    value: SecretStr
+
+
+class SetProjectNetworkChange(Dto):
+    type: Literal["set_project_network"] = "set_project_network"
+    project_id: str
+    mode: NetworkMode
+
+
+class SetProjectDownloadsChange(Dto):
+    type: Literal["set_project_downloads"] = "set_project_downloads"
+    project_id: str
+    enabled: bool
+
+
+class SetPdfFallbackChange(Dto):
+    type: Literal["set_pdf_fallback"] = "set_pdf_fallback"
+    value: str | None
+
+
+SettingChange = Annotated[
+    SetEmailChange
+    | AddAllowedFolderChange
+    | SetProviderKeyChange
+    | SetProjectNetworkChange
+    | SetProjectDownloadsChange
+    | SetPdfFallbackChange,
+    Field(discriminator="type"),
+]
+
+
+class UpdateWebSettingsIn(Dto):
+    expected_settings_revision: str
+    change: SettingChange
+    idempotency_key: IdempotencyKey
+
+
+class WebIntentOut(Out):
+    confirmation_token: str
+    expires_at: datetime
+    purpose: Literal["review", "settings", "file_review"]
+    summary: dict[str, Any]
+
+
 # ---------- the service ----------
 
 
@@ -742,6 +1089,11 @@ class RefCollectorService(Protocol):
     def list_projects(self, ctx: CallContext, req: ListProjectsIn) -> ListProjectsOut: ...
     def create_project(self, ctx: CallContext, req: CreateProjectIn) -> CreateProjectOut: ...
     def get_project(self, ctx: CallContext, req: GetProjectIn) -> GetProjectOut: ...
+    def rename_project(self, ctx: CallContext, req: RenameProjectIn) -> RenameProjectOut: ...
+    def get_project_consequences(
+        self, ctx: CallContext, req: GetProjectConsequencesIn
+    ) -> GetProjectConsequencesOut: ...
+    def delete_project(self, ctx: CallContext, req: DeleteProjectIn) -> DeleteProjectOut: ...
     def import_source(self, ctx: CallContext, req: ImportSourceIn) -> ImportSourceOut: ...
     def list_sources(self, ctx: CallContext, req: ListSourcesIn) -> ListSourcesOut: ...
     def get_source(self, ctx: CallContext, req: GetSourceIn) -> GetSourceOut: ...
@@ -764,6 +1116,32 @@ class RefCollectorService(Protocol):
     # CLI only
     def update_project_settings(self, ctx: CallContext, req: UpdateProjectSettingsIn) -> GetProjectOut: ...
     def review_decision(self, ctx: CallContext, req: ReviewDecisionIn) -> UpdateReferenceOut: ...
+
+    # Section 10 additions
+    def list_jobs(self, ctx: CallContext, req: ListJobsIn) -> ListJobsOut: ...
+    def list_global_artifacts(
+        self, ctx: CallContext, req: ListGlobalArtifactsIn
+    ) -> ListGlobalArtifactsOut: ...
+    def get_executor_status(self, ctx: CallContext, req: GetExecutorStatusIn) -> GetExecutorStatusOut: ...
+    def read_project_file(self, ctx: CallContext, req: ReadProjectFileIn) -> ReadProjectFileOut: ...
+    def upload_pdf(self, ctx: CallContext, req: UploadPdfIn, body: BinaryIO) -> UploadPdfOut: ...
+    def render_source_page(self, ctx: CallContext, req: RenderSourcePageIn) -> RenderSourcePageOut: ...
+
+    # Web Wave 3 additions
+    def prepare_web_review(self, ctx: CallContext, req: ReviewDecisionIn) -> WebIntentOut: ...
+    def confirm_web_review(
+        self, ctx: CallContext, req: ReviewDecisionIn, confirmation_token: str
+    ) -> UpdateReferenceOut: ...
+    def prepare_web_file_review(self, ctx: CallContext, req: ReviewFileDecisionIn) -> WebIntentOut: ...
+    def confirm_web_file_review(
+        self, ctx: CallContext, req: ReviewFileDecisionIn, confirmation_token: str
+    ) -> ReviewFileDecisionOut: ...
+    def get_settings(self, ctx: CallContext, req: GetSettingsIn) -> GetSettingsOut: ...
+    def prepare_web_settings(self, ctx: CallContext, req: UpdateWebSettingsIn) -> WebIntentOut: ...
+    def confirm_web_settings(
+        self, ctx: CallContext, req: UpdateWebSettingsIn, confirmation_token: str
+    ) -> GetSettingsOut: ...
+    def update_web_settings(self, ctx: CallContext, req: UpdateWebSettingsIn) -> GetSettingsOut: ...
 
 
 @dataclass(frozen=True)

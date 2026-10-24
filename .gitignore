@@ -27,3 +27,13 @@ Thumbs.db
 
 # Local agent task files
 .ai/
+
+# Local scratch and agent configuration files
+.taste-skill/
+jean.json
+
+# Build and package artifacts
+dist/
+build/
+*.egg-info/
+node_modules/

@@ -8,6 +8,7 @@ from refcollector.domain.enums import (
     IdentityState,
     StepType,
 )
+from refcollector.identity.identifiers import unique_doi
 from refcollector.pipeline.state import input_key, scoped, view
 
 
@@ -37,6 +38,8 @@ class JobPlanner:
                     or self.invalidated(store, o)
                     or job.options.get("refresh")
                 ]
+            elif stage == StepType.RETRIEVE_DOI:
+                rows = [o for o in rows if unique_doi(o.text)]
             else:
                 rows = [o for o in rows if o.identity in ACCEPTED_IDENTITIES and o.work_id]
             cap = job.options.get("max_occurrences")
@@ -44,7 +47,10 @@ class JobPlanner:
                 rows = rows[:cap]
             store.occurrences.link_to_job(job.project_id, job.job_id, [o.occurrence_id for o in rows])
             subjects = list(
-                dict.fromkeys(o.occurrence_id if stage == StepType.RESOLVE else o.work_id for o in rows)
+                dict.fromkeys(
+                    o.occurrence_id if stage in (StepType.RESOLVE, StepType.RETRIEVE_DOI) else o.work_id
+                    for o in rows
+                )
             )
         specs = []
         for subject in subjects:
@@ -58,12 +64,14 @@ def handler_registry(settings, providers, extractor):
     from refcollector.pipeline.handlers import DiscoverHandler, ExtractHandler, ResolveHandler
     from refcollector.pipeline.outputs import DraftHandler, ExportHandler
     from refcollector.pipeline.retrieve import RetrieveHandler
+    from refcollector.pipeline.retrieve_doi import DoiRetrieveHandler
 
     handlers = [
         ExtractHandler(extractor),
         ResolveHandler(providers),
         DiscoverHandler(providers),
         RetrieveHandler(settings, providers),
+        DoiRetrieveHandler(settings, providers),
         ExportHandler(),
         DraftHandler(),
     ]

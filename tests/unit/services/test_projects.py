@@ -15,8 +15,10 @@ from refcollector.contracts.api import (
 )
 from refcollector.domain.enums import (
     AuditEventType,
+    IdentityState,
     NetworkMode,
     PolicyProfile,
+    RetrievalState,
     Scope,
     VersionPolicy,
 )
@@ -130,9 +132,13 @@ def test_list_and_get_project_counts(env):
     assert item.counts["occurrences"] == 2 and item.counts["sources"] == 1
     got = env.svc.get_project(env.ctx, GetProjectIn(project_id=pid))
     assert got.counts["occurrences"] == 2
-    assert got.counts["by_identity"] == {"unprocessed": 2}
+    assert got.counts["by_identity"] == {
+        state.value: 2 if state is IdentityState.UNPROCESSED else 0 for state in IdentityState
+    }
     assert got.counts["by_access"] == {"not_checked": 2}
-    assert got.counts["by_retrieval"] == {"not_requested": 2}
+    assert got.counts["by_retrieval"] == {
+        state.value: 2 if state is RetrievalState.NOT_REQUESTED else 0 for state in RetrievalState
+    }
     assert got.sources_count == 1
     assert got.policy["identity_policy_version"] == IDENTITY_POLICY_VERSION
     assert got.network_mode == "metadata"

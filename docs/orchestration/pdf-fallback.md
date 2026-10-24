@@ -36,6 +36,15 @@ Templates require HTTPS and exactly one `{doi}` in the path. Credentials, query
 strings, fragments and other placeholders are rejected. The DOI is normalized
 and encoded as one path component.
 
+## Library UI
+
+The collection toolbar and each uploaded paper have a **Download with fallback**
+button. The button tries normal sources first, then the configured fallback preset.
+It selects `any_eligible` for this job only. It does not change the collection policy
+or configure a preset. Configure the preset through the trusted local CLI first.
+The normal **Download all** button uses the collection version policy.
+Both buttons require collection folder access, retrieval mode, and download permission.
+
 ## Retrieval behavior
 
 Local usable copies and normal selected sources run first. The fallback runs only

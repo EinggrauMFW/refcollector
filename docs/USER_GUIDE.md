@@ -1,17 +1,123 @@
 # Refcollector user guide
 
-## 1. Start the app
+This guide covers the current Library UI. The older application is documented
+in the legacy section below. For CLI commands, see [README](../README.md).
+
+## Open the Library
+
+Install the optional web dependencies and start the app:
+
+```powershell
+uv sync --extra web --frozen
+uv run --extra web --frozen python -m refcollector serve web --host 127.0.0.1 --port 8001
+```
+
+Open <http://127.0.0.1:8001/>. In Jean, use the configured Run command instead
+of starting a second server. The advanced dashboard is at `/advanced`.
+
+## Create a collection and grant access
+
+1. Choose **New collection** and enter its name and folder.
+2. In the collection sidebar, collections can be renamed, pinned to the top of the list,
+   or deleted. Deleting a collection removes the project from RefCollector, but preserves
+   the collection folder and all its files on disk.
+3. Open **Review permissions** for the collection.
+4. Grant folder access, retrieval network mode, and downloads. Each change has
+   its own description and confirmation. Cancel leaves that setting unchanged.
+
+The folder contains copies of your uploaded and verified PDFs. RefCollector
+keeps its authoritative files under `RC_HOME`. Changing or deleting a folder
+copy does not change the stored reference record.
+
+## Upload and check references
+
+1. Choose **Upload PDFs**, or drop a PDF onto the shelf.
+2. Wait for extraction. Expand the uploaded paper to inspect its citations.
+3. To get PDFs immediately, choose **Download PDFs by DOI**. You do not need to
+   run **Find metadata** or approve a metadata match first.
+4. Optionally choose **Find metadata** for the collection or paper.
+5. To resolve metadata warnings, open the candidate rows. Compare title, authors, year, and DOI with the
+   candidate before accepting it. Confirm each identity decision separately. Accepting a candidate
+   automatically collapses the candidate selection and returns focus to the citation row.
+
+**Provider disagreement** is a metadata warning. It does not block DOI downloading
+or opening a PDF that passed its checks. You can leave metadata unresolved.
+
+| Citation state | Meaning and next action |
+|---|---|
+| Extracted | Citation text exists. Find metadata. |
+| Check | Identity, extraction, or a downloaded PDF needs inspection. Open the row. |
+| No match | No accepted identity. Inspect candidates or use the advanced dashboard for repair. |
+| Matched | Identity is accepted; access discovery has not completed. |
+| PDF available | Discovery found an eligible location. Download permission and version policy still apply. |
+| No PDF | Discovery found no eligible copy under the current result. This does not prove paywall status. |
+| Downloaded | A verified file or usable local copy is available. Open the citation to view it. |
+| Failed | An operation failed. Read its reason before retrying. |
+
+## Download and approve PDFs
+
+For a citation with one clear DOI, choose **Download PDF by DOI** in its row.
+Use **Download PDFs by DOI** to process eligible citations in a paper or collection.
+The DOI service must first be configured through the trusted local CLI; see README.
+No metadata confirmation is required. Duplicate forms of the same DOI count as one;
+multiple different DOIs require correction rather than guessing a target.
+
+Passing PDFs become available automatically. Metadata suggestions remain independent.
+Only a PDF that fails reviewable checks needs **Approve PDF** or **Reject PDF**.
+An unsafe or unreadable response fails retrieval and cannot be approved as a usable PDF.
+
+**Download all** retains the normal accepted-metadata workflow. Wait for its terminal result. Review warnings even
+when the job completes. A successful job does not mean every citation has a PDF.
+
+A PDF that fails an identity check stays pending. Its file panel names the
+cited work, file size, source host, and failed checks. Open the PDF first.
+Choose **Approve PDF** only when you have checked that it is the intended work,
+then confirm the description. One confirmation approves one file. Approval marks
+the file verified and records the overridden checks in the audit. **Reject PDF**
+keeps the file unverified and records the rejection.
+
+Verified PDFs appear on the shelf with **Cited by**. Click a downloaded citation
+to open its PDF. The collection folder receives a copy. Repeating **Download all**
+does not intentionally create duplicates; existing usable copies take priority.
+File approval is available through the confirmed web flow, not through MCP.
+
+## Find papers and resolve problems
+
+Search the shelf by title, author, year, venue, or DOI. Use the kind and citation
+status filters to narrow the list. Light and dark themes are available and shared
+with the Advanced dashboard (`/advanced`).
+
+| Problem | Action |
+|---|---|
+| Download is unavailable | Check folder access, retrieval mode, and download permission under **Review permissions**. |
+| A card says **Not in folder** | Restore folder access and retry sync. The stored PDF remains available independently of the folder copy. |
+| A PDF is waiting for approval | Inspect the PDF and its failed checks, then use the two-step file decision. |
+| Metadata shows **Provider disagreement** | You may download by a clear cited DOI immediately. Resolve metadata separately if needed. |
+| DOI download is unavailable | Check that the citation has one clear DOI and that the trusted DOI service is configured. |
+| A job finishes with warnings | Read the per-citation reasons. Provider failures and version-policy skips can affect individual papers. |
+| A confirmation expires or the reference changes | Reopen the action and inspect a new confirmation. |
+| Export or detailed reference repair is needed | Open **Advanced dashboard**. CLI usage is documented in README. |
+
+## Legacy application reference
+
+The remaining sections describe only `legacy/`. Its data, settings, commands,
+and port are separate from the current Library UI.
+
+### 1. Start the app
 
 ```bash
 cd refcollector
-pip install -r requirements.txt      # first time only
-python legacy/webapp/app.py
+uv run --with-requirements legacy/requirements.txt --with "pymupdf<2" python legacy/webapp/app.py
 ```
+
+This command supplies the legacy web dependencies separately from the core
+CLI environment. A plain core `uv run` does not include them. See the
+[uv dependency documentation](https://docs.astral.sh/uv/guides/scripts/#running-a-script-with-dependencies).
 
 Open <http://127.0.0.1:8000> in your browser. The app runs only on your own computer.
 Stop it with `Ctrl+C` in the terminal.
 
-## 2. Settings (once)
+### 2. Settings (once)
 
 | Field | Why |
 |---|---|
@@ -19,16 +125,18 @@ Stop it with `Ctrl+C` in the terminal.
 | **Your name, affiliation, purpose** | Filled into the request emails for paywalled papers. Optional. |
 | **Library folder** | Where results are saved. Leave empty for `legacy/webapp/library/`. Applies to new jobs. |
 
-Press **Save**.
+Press **Save**. The web app stores these settings in
+`legacy/webapp/data/config.json`; it does not read the current CLI's `RC_HOME`
+settings. A configured CLI email does not configure the legacy web app.
 
-## 3. Run a job
+### 3. Run a job
 
 1. Under **New job**, choose the thesis or paper PDF.
 2. Keep **Download open-access PDFs** ticked to fetch free copies, or untick it for metadata only.
 3. Press **Start**. A progress bar shows how many references are processed; a thesis with 80
    references takes a few minutes.
 
-## 4. Read the results
+### 4. Read the results
 
 The table lists every reference. Click a row to open its detail: full title, journal, volume, pages,
 publisher, DOI and links, authors with their institutions and ORCID, citation count, open-access
@@ -56,12 +164,12 @@ status, topics, keywords and abstract, and how it was matched.
 
 Always glance at **review** rows. A wrong match is worse than a missing one.
 
-### Fixing an unresolved entry
+#### Fixing an unresolved entry
 
 Open the row, paste a DOI you know into **Known DOI**, press **Look up**. The record is added and the
 exports are regenerated.
 
-## 5. Paywalled papers
+### 5. Paywalled papers
 
 For each paywalled paper the detail row has a drafted email:
 
@@ -72,7 +180,7 @@ For each paywalled paper the detail row has a drafted email:
 Author emails are not in the databases. Use the DOI link (publisher page) to find the corresponding
 author's address. Nothing is sent by the app; you send the email yourself.
 
-## 6. Export
+### 6. Export
 
 Buttons above the table:
 
@@ -85,7 +193,7 @@ Buttons above the table:
 | JSON | `references.json` | everything, including the raw citation text |
 | PDFs (zip) | | all downloaded PDFs |
 
-## 7. Where files are saved
+### 7. Where files are saved
 
 Every job gets a folder named after the paper's title:
 
@@ -99,7 +207,7 @@ library/<Paper title>/
 └── .job.json               app state (leave alone)
 ```
 
-## 8. Command line
+### 8. Command line
 
 ```bash
 python legacy/refcollector.py paper.pdf --email you@example.com --out output
@@ -108,7 +216,7 @@ python legacy/refcollector.py paper.pdf --email you@example.com --out output
 Writes `references.bib`, `references.csl.json`, `references.json`, `unresolved.txt` and a `pdfs/` folder.
 Add `--no-download` to skip PDFs.
 
-## 9. Troubleshooting
+### 9. Troubleshooting
 
 | Problem | Fix |
 |---|---|
@@ -119,7 +227,7 @@ Add `--no-download` to skip PDFs.
 | Semantic Scholar is slow | Anonymous requests share a rate limit. Set the `S2_API_KEY` environment variable if you have a key. |
 | "Set your email in Settings first" | Save a real email in Settings, then start the job. |
 
-## 10. Limits to keep in mind
+### 10. Limits to keep in mind
 
 - Only legally free (open-access) PDFs are downloaded.
 - Technical reports, standards and government documents rarely exist in scholarly databases; they end

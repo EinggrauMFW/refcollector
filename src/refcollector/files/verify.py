@@ -18,6 +18,7 @@ from refcollector.config import Limits
 from refcollector.contracts.ports import VerificationResult
 from refcollector.domain.enums import CopyVersion, RetrievalState
 from refcollector.domain.models import WorkMetadata
+from refcollector.identity.identifiers import normalize_doi
 
 
 def _words(text: str) -> str:
@@ -35,6 +36,45 @@ def _version(text: str) -> tuple[CopyVersion, bool]:
         if re.search(r"^\s*(?:" + pattern + r")\s*\.?\s*$", lower, re.MULTILINE):
             found.add(version)
     return (next(iter(found)) if len(found) == 1 else CopyVersion.UNKNOWN, len(found) > 1)
+
+
+_PRIMARY_DOI_DECLARATION = re.compile(
+    r"^(?:(?:doi|digital\s+object\s+identifier)\s*:?\s*)?"
+    r"(?:(?:https?://)?(?:dx\.)?doi\.org/\s*)?"
+    r"""10\.\d{4,9}/[^\s<>'"]+$""",
+    re.IGNORECASE,
+)
+
+
+def _extract_primary_dois(opening_text: str) -> list[str]:
+    declared = set()
+    for raw_line in opening_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if re.match(r"^(?:\[\d+\]|\(\d+\)|\d+\.)\s+", line):
+            continue
+        if re.match(r"^(?:references?|bibliography|citations?)\b", line, re.I):
+            continue
+        stripped = line
+        while True:
+            stripped = stripped.strip("<>\"' \t")
+            while stripped and stripped[-1] in ".,;":
+                stripped = stripped[:-1].strip()
+            unwrapped = False
+            for open_b, close_b in (("(", ")"), ("[", "]")):
+                if stripped.startswith(open_b) and stripped.endswith(close_b):
+                    inner = stripped[1:-1].strip("<>\"' \t")
+                    if inner.count(open_b) == inner.count(close_b):
+                        stripped = inner
+                        unwrapped = True
+                        break
+            if not unwrapped:
+                break
+        if _PRIMARY_DOI_DECLARATION.fullmatch(stripped):
+            if normalized := normalize_doi(stripped):
+                declared.add(normalized)
+    return sorted(declared)
 
 
 class DefaultFileVerifier:
@@ -87,19 +127,19 @@ class DefaultFileVerifier:
         text = "\n".join(texts)
         dois = sorted(
             {
-                value.rstrip(".,;:)]}").casefold()
+                normalize_doi(value)
                 for value in re.findall(r"\b10\.\d{4,9}/[^\s<>\"]+", text, re.IGNORECASE)
+                if normalize_doi(value)
             }
         )
         # Title must be in the opening text, before the abstract or references. A DOI
         # in the bibliography does not establish that this is the requested paper.
         opening = re.split(r"\b(?:abstract|references|bibliography)\b", text, maxsplit=1, flags=re.I)[0]
-        primary_dois = sorted(
-            {
-                value.rstrip(".,;:)]}").casefold()
-                for value in re.findall(r"\b10\.\d{4,9}/[^\s<>\"]+", opening, re.IGNORECASE)
-            }
-        )
+        page0_text = texts[0] if texts else ""
+        page0_opening = re.split(
+            r"\b(?:abstract|references|bibliography)\b", page0_text, maxsplit=1, flags=re.I
+        )[0]
+        primary_dois = _extract_primary_dois(page0_opening)
         title = _words(work.title or "")
         opening_words = _words(opening)
         # Contiguous word run anywhere in the opening: tolerates a journal header, a DOI line
@@ -112,6 +152,7 @@ class DefaultFileVerifier:
             title_words
         )
         expected_doi = (work.doi or "").casefold().removeprefix("https://doi.org/").removeprefix("doi:")
+        expected_doi = normalize_doi(expected_doi) or expected_doi
         reasons = []
         conflict = False
         if expected_doi:

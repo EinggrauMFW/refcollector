@@ -1,0 +1,68 @@
+package,version,scope_union,reported_license,review_note,pypi_metadata_source
+aiolimiter,1.3.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/aiolimiter/1.3.0/json
+annotated-doc,0.0.5,core;web,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/annotated-doc/0.0.5/json
+annotated-types,0.8.0,core;web,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/annotated-types/0.8.0/json
+anyio,4.15.1,core;web;dev,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/anyio/4.15.1/json
+attrs,26.1.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/attrs/26.1.0/json
+backports-tarfile,1.2.0,core,License :: OSI Approved :: MIT License,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/backports-tarfile/1.2.0/json
+bibtexparser,2.1.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/bibtexparser/2.1.0/json
+certifi,2026.10.19,core;dev,MPL-2.0,Updated to recommended trust-store release; exact-version PyPI response has no advisories.,https://pypi.org/pypi/certifi/2026.10.19/json
+cffi,2.1.1,core,MIT-0,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/cffi/2.1.1/json
+click,8.5.0,core;web,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/click/8.5.0/json
+colorama,0.4.6,core;dev,License :: OSI Approved :: BSD License,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/colorama/0.4.6/json
+cryptography,50.0.2,core,Apache-2.0 OR BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/cryptography/50.0.2/json
+fastapi,0.156.4,web,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/fastapi/0.156.4/json
+h11,0.16.0,core;web;dev,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/h11/0.16.0/json
+httpcore,1.0.9,core;dev,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/httpcore/1.0.9/json
+httpcore2,2.15.1,core,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/httpcore2/2.15.1/json
+httpx,0.28.1,core;dev,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/httpx/0.28.1/json
+httpx2,2.15.1,core,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/httpx2/2.15.1/json
+httpx2-jsfetch,1.0,core,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/httpx2-jsfetch/1.0/json
+idna,3.20,core;web;dev,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/idna/3.20/json
+importlib-metadata,9.0.1,core,Apache-2.0,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/importlib-metadata/9.0.1/json
+iniconfig,2.3.1,dev,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/iniconfig/2.3.1/json
+jaraco-classes,3.4.0,core,License :: OSI Approved :: MIT License,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/jaraco-classes/3.4.0/json
+jaraco-context,6.1.2,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/jaraco-context/6.1.2/json
+jaraco-functools,4.6.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/jaraco-functools/4.6.0/json
+jeepney,0.9.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/jeepney/0.9.0/json
+jsonschema,4.26.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/jsonschema/4.26.0/json
+jsonschema-specifications,2025.9.1,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/jsonschema-specifications/2025.9.1/json
+keyring,25.7.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/keyring/25.7.0/json
+markdown-it-py,4.2.0,core,License :: OSI Approved :: MIT License,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/markdown-it-py/4.2.0/json
+mcp,2.3.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/mcp/2.3.0/json
+mcp-types,2.3.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/mcp-types/2.3.0/json
+mdurl,0.1.2,core,License :: OSI Approved :: MIT License,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/mdurl/0.1.2/json
+more-itertools,11.2.1,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/more-itertools/11.2.1/json
+opentelemetry-api,1.45.1,core;web,Apache-2.0,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/opentelemetry-api/1.45.1/json
+packaging,26.3,dev,Apache-2.0 OR BSD-2-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/packaging/26.3/json
+platformdirs,4.13.5,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/platformdirs/4.13.5/json
+pluggy,1.7.0,dev,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pluggy/1.7.0/json
+portalocker,4.4.1,core,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/portalocker/4.4.1/json
+pycparser,3.11,core,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pycparser/3.11/json
+pydantic,2.14.1,core;web,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pydantic/2.14.1/json
+pydantic-core,2.50.1,core;web,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pydantic-core/2.50.1/json
+pygments,2.21.0,core;dev,BSD-2-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pygments/2.21.0/json
+pyjwt,2.15.1,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pyjwt/2.15.1/json
+pylatexenc,2.11,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pylatexenc/2.11/json
+pymupdf,1.28.2,core,Dual Licensed - GNU AFFERO GPL 3.0 or Artifex Commercial License,AGPL/commercial decision required; includes MuPDF native components.,https://pypi.org/pypi/pymupdf/1.28.2/json
+pytest,9.1.1,dev,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pytest/9.1.1/json
+python-multipart,0.0.32,core;web,Apache-2.0,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/python-multipart/0.0.32/json
+pywin32,312,core,PSF,Mixed licences; installed adodbapi includes LGPL-2.1 text; PSF summary is incomplete.,https://pypi.org/pypi/pywin32/312/json
+pywin32-ctypes,0.2.3,core,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/pywin32-ctypes/0.2.3/json
+rapidfuzz,3.14.6,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/rapidfuzz/3.14.6/json
+referencing,0.37.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/referencing/0.37.0/json
+respx,0.23.1,dev,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/respx/0.23.1/json
+rich,15.0.0,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/rich/15.0.0/json
+rpds-py,2026.9.1,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/rpds-py/2026.9.1/json
+ruff,0.17.1,dev,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/ruff/0.17.1/json
+secretstorage,3.5.0,core,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/secretstorage/3.5.0/json
+shellingham,1.5.4,core,ISC License,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/shellingham/1.5.4/json
+sse-starlette,3.5.0,core,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/sse-starlette/3.5.0/json
+starlette,1.9.0,core;web,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/starlette/1.9.0/json
+tenacity,9.2.1,core,Apache-2.0,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/tenacity/9.2.1/json
+truststore,0.10.5,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/truststore/0.10.5/json
+typer,0.27.3,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/typer/0.27.3/json
+typing-extensions,4.16.0,core;web;dev,PSF-2.0,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/typing-extensions/4.16.0/json
+typing-inspection,0.4.4,core;web,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/typing-inspection/0.4.4/json
+uvicorn,0.54.0,core;web,BSD-3-Clause,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/uvicorn/0.54.0/json
+zipp,4.1.1,core,MIT,Metadata screening; preserve actual upstream notices.,https://pypi.org/pypi/zipp/4.1.1/json

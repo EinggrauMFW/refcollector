@@ -67,6 +67,9 @@ def view(store, job, stage, subject):
             "decisions": store.decisions.list_for_occurrence(pid, subject),
             "work": store.works.get(pid, occ.work_id) if occ.work_id else None,
         }
+    if stage == "retrieve_doi":
+        occ = store.occurrences.get(pid, subject)
+        return {"occ": occ, "files": store.citation_files.list_for_occurrence(pid, subject)}
     if stage in ("retrieve", "discover_access"):
         return {
             "work": store.works.get(pid, subject),

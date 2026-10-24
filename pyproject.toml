@@ -1,14 +1,17 @@
 [project]
 name = "refcollector"
-version = "0.2.0.dev0"
+version = "0.2.0b1"
 description = "Turn a document's bibliography into a checked, traceable reference library."
 readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE", "LICENSING.md", "THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.11"
 # Runtime stack from spec 14.2. FastAPI is P1 (web app, decision D-05).
 dependencies = [
     "mcp>=2.0,<3",
     "pydantic>=2.7,<3",
     "httpx>=0.28,<1",
+    "certifi>=2026.10.19",  # Trust-store compatibility update; security guidance 2026-10-20
     "aiolimiter>=1.1",
     "tenacity>=8.2",
     "pymupdf>=1.24,<2",  # 2.x pulls onnxruntime layout deps; untested (D-17)
@@ -23,19 +26,30 @@ dependencies = [
 [project.scripts]
 refcollector = "refcollector.cli.main:app"
 
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.110,<1",
+    "python-multipart>=0.0.9",
+    "uvicorn>=0.29,<1",
+]
+
 [dependency-groups]
 dev = [
-    "pytest>=8",
+    # pytest 9.1.x drops subdir conftest fixtures for some mixed-order file args; lift when fixed upstream.
+    "pytest>=8,<9.1",
     "respx>=0.21",
     "ruff>=0.6",
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.32.4"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/refcollector"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/jean.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

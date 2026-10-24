@@ -14,12 +14,19 @@ Conventions other work packages rely on:
 from __future__ import annotations
 
 import codecs
+import dataclasses
 import hashlib
+import json
+import math
+import os
 from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, BinaryIO, TypeVar
+from urllib.parse import urlparse
+
+import pymupdf
 
 from refcollector import __version__
 from refcollector.config import (
@@ -27,7 +34,15 @@ from refcollector.config import (
     IDENTITY_POLICY_VERSION,
     P0_PROVIDERS,
     Settings,
+    config_lock,
+    get_secret,
+    keyed_secret_digest,
+    keys_fingerprints,
+    load_settings,
+    normalize_pdf_fallback,
+    save_settings,
     secrets_present,
+    set_secret,
 )
 from refcollector.contracts import api
 from refcollector.contracts.api import (
@@ -50,17 +65,20 @@ from refcollector.domain.enums import (
     ACCEPTED_IDENTITIES,
     TERMINAL_JOB_STATES,
     AccessClassification,
+    ApprovalSurface,
     AuditEventType,
     Channel,
     DiscoveryState,
     ExportFormat,
     ExtractionState,
     IdentityState,
+    JobState,
     LocalCopyOrigin,
     LocalCopyState,
     NetworkMode,
     Origin,
     PolicyProfile,
+    ReasonCode,
     RetrievalState,
     Scope,
     SourceType,
@@ -72,9 +90,11 @@ from refcollector.domain.models import (
     ConfigSnapshot,
     IdempotencyRecord,
     Job,
+    LocalCopy,
     Occurrence,
     Preflight,
     Project,
+    ProjectWork,
     Provenance,
     SectionInfo,
     Source,
@@ -83,7 +103,10 @@ from refcollector.domain.models import (
 )
 from refcollector.errors import (
     ConfigMissingEmail,
+    EncryptedDocument,
+    FileValidationFailed,
     IdempotencyConflict,
+    IntegrationUnavailable,
     InvalidInput,
     InvalidState,
     LimitExceeded,
@@ -97,6 +120,7 @@ from refcollector.errors import (
     UnsupportedSource,
 )
 from refcollector.executor.snapshot import build_snapshot
+from refcollector.identity.identifiers import unique_doi
 from refcollector.ids import new_id
 from refcollector.services import changes
 from refcollector.services.support import (
@@ -107,6 +131,11 @@ from refcollector.services.support import (
     fingerprint,
     run_sync,
     scope_key,
+)
+from refcollector.services.web_auth import IntentRegistry
+from refcollector.services.web_settings import (
+    build_get_settings_out,
+    compute_settings_revision,
 )
 
 O = TypeVar("O", bound=Out)  # noqa: E741
@@ -138,6 +167,7 @@ class RefCollectorServiceImpl:
         identity_factory: Callable[[ConfigSnapshot], IdentityResolver],
         local_copies: LocalCopyChecker,
         clock: Callable[[], datetime] = utcnow,
+        executor: Any = None,
     ) -> None:
         self.settings = settings
         self.store = store
@@ -146,14 +176,33 @@ class RefCollectorServiceImpl:
         self.identity_factory = identity_factory
         self.local_copies = local_copies
         self.clock = clock
+        self.executor = executor
+        self._intent_registry = IntentRegistry()
+        self._config_path = settings.config_path.resolve()
+        self._config_mtime_ns: int | None = (
+            self._config_path.stat().st_mtime_ns if self._config_path.exists() else None
+        )
 
     # ================================================================ plumbing
+
+    def _maybe_refresh_settings(self) -> Settings:
+        try:
+            if not self._config_path.exists():
+                return self.settings
+            current_mtime = self._config_path.stat().st_mtime_ns
+            if self._config_mtime_ns is None or current_mtime != self._config_mtime_ns:
+                self.settings = load_settings(self._config_path.parent)
+                self._config_mtime_ns = current_mtime
+        except OSError:
+            pass
+        return self.settings
 
     def provenance(self, ctx: CallContext) -> Provenance:
         return Provenance(principal=ctx.principal, channel=ctx.channel, origin=Origin(ctx.origin))
 
     def snapshot(self, project: Project) -> ConfigSnapshot:
-        return build_snapshot(self.settings, project, {self.extractor.name: self.extractor.version})
+        current = self._maybe_refresh_settings()
+        return build_snapshot(current, project, {self.extractor.name: self.extractor.version})
 
     def all_occurrences(self, project_id: str, query: OccurrenceQuery) -> list[Occurrence]:
         out: list[Occurrence] = []
@@ -186,11 +235,21 @@ class RefCollectorServiceImpl:
         sk = scope_key(*key)
         return decode_cursor(cursor, sk, self.clock(), self.settings.limits.cursor_ttl_s), sk
 
-    def _replay(self, ctx: CallContext, pid: str, tool: str, req: Any, out_type: type[O]) -> O | None:
+    def _replay(
+        self,
+        ctx: CallContext,
+        pid: str,
+        tool: str,
+        req: Any,
+        out_type: type[O],
+        *,
+        fingerprint_override: str | None = None,
+    ) -> O | None:
         rec = self.store.idempotency.get(ctx.principal, pid, tool, req.idempotency_key, now=self.clock())
         if rec is None:
             return None
-        if rec.fingerprint != fingerprint(req):
+        expected_fp = fingerprint_override or fingerprint(req)
+        if rec.fingerprint != expected_fp:
             raise IdempotencyConflict(f"key {req.idempotency_key} was used with a different request")
         return out_type.model_validate(rec.result)
 
@@ -205,16 +264,21 @@ class RefCollectorServiceImpl:
         *,
         prepare: Callable[[], Any] | None = None,
         bump: bool = True,
+        fingerprint_override: str | None = None,
     ) -> O:
         """One immediate transaction (D-26): idempotency (11.3), the change, audit, revision +1."""
         pid = project_id or ""
         if project_id:
             self.store.projects.get(project_id)
-        if (hit := self._replay(ctx, pid, tool, req, out_type)) is not None:
+        if (
+            hit := self._replay(ctx, pid, tool, req, out_type, fingerprint_override=fingerprint_override)
+        ) is not None:
             return hit
         prepared = prepare() if prepare else None  # slow reads (PDF parse, providers) outside the lock
         with self.store.transaction(immediate=True):
-            if (hit := self._replay(ctx, pid, tool, req, out_type)) is not None:
+            if (
+                hit := self._replay(ctx, pid, tool, req, out_type, fingerprint_override=fingerprint_override)
+            ) is not None:
                 return hit
             now = self.clock()
             project = self.store.projects.get(project_id) if project_id else None
@@ -232,7 +296,7 @@ class RefCollectorServiceImpl:
                     project_id=pid,
                     tool=tool,
                     key=req.idempotency_key,
-                    fingerprint=fingerprint(req),
+                    fingerprint=fingerprint_override or fingerprint(req),
                     result=out.model_dump(mode="json"),
                     created_at=now,
                     expires_at=expiry(now, self.settings.limits.idempotency_ttl_s),
@@ -274,6 +338,7 @@ class RefCollectorServiceImpl:
         return job
 
     def _require_email(self) -> None:
+        self._maybe_refresh_settings()
         if not self.settings.email:
             raise ConfigMissingEmail()
 
@@ -281,6 +346,8 @@ class RefCollectorServiceImpl:
 
     def _summary(self, occ: Occurrence) -> api.OccurrenceSummary:
         n = len(self.store.candidates.list_for_occurrence(occ.project_id, occ.occurrence_id))
+        citation_files = self._current_citation_files(occ)
+        latest = citation_files[-1] if citation_files else None
         return api.OccurrenceSummary(
             occurrence_id=occ.occurrence_id,
             source_id=occ.source_id,
@@ -299,7 +366,19 @@ class RefCollectorServiceImpl:
             local_copy=occ.local_copy,
             retrieval=occ.retrieval,
             warnings=[w.value for w in occ.warnings],
+            order=occ.order,
+            work_id=occ.work_id,
+            citation_doi=unique_doi(occ.text) if occ.extraction != ExtractionState.EXCLUDED else None,
+            citation_file_id=latest.citation_file_id if latest else None,
+            citation_file_state=latest.state if latest else None,
         )
+
+    def _current_citation_files(self, occ: Occurrence):
+        return [
+            file
+            for file in self.store.citation_files.list_for_occurrence(occ.project_id, occ.occurrence_id)
+            if file.is_current(occ)
+        ]
 
     def _job_summaries(self, project_id: str, limit: int = 10) -> list[api.JobSummary]:
         return [
@@ -330,14 +409,33 @@ class RefCollectorServiceImpl:
 
     def _project_view(self, project: Project, revision: int | None = None) -> api.GetProjectOut:
         pid = project.project_id
-        occs = self.all_occurrences(pid, OccurrenceQuery())
-        arts, after = [], None
-        while True:  # ids sort by time: the newest artifacts are last
-            page = self.store.artifacts.list(pid, after=after, limit=CHUNK)
-            arts += page.items
-            if page.next_after is None:
-                break
-            after = page.next_after
+        with self.store.transaction():
+            occs = self.all_occurrences(pid, OccurrenceQuery())
+            arts, after = [], None
+            while True:  # ids sort by time: the newest artifacts are last
+                page = self.store.artifacts.list(pid, after=after, limit=CHUNK)
+                arts += page.items
+                if page.next_after is None:
+                    break
+                after = page.next_after
+            sources_count = self.store.sources.list(pid, limit=1).total or 0
+            recent_jobs = self._job_summaries(pid)
+        by_extraction = {e.value: 0 for e in ExtractionState}
+        by_identity = {i.value: 0 for i in IdentityState}
+        by_discovery = {d.value: 0 for d in DiscoveryState}
+        by_classification = {c.value: 0 for c in AccessClassification}
+        by_classification["unclassified"] = 0
+        by_local_copy = {lc.value: 0 for lc in LocalCopyState}
+        by_retrieval = {r.value: 0 for r in RetrievalState}
+
+        for o in occs:
+            by_extraction[o.extraction.value] += 1
+            by_identity[o.identity.value] += 1
+            by_discovery[o.discovery.value] += 1
+            by_classification[o.classification.value if o.classification else "unclassified"] += 1
+            by_local_copy[o.local_copy.value] += 1
+            by_retrieval[o.retrieval.value] += 1
+
         return api.GetProjectOut(
             project_id=pid,
             name=project.name,
@@ -351,14 +449,19 @@ class RefCollectorServiceImpl:
             network_mode=project.network_mode.value,
             counts={
                 "occurrences": len(occs),
-                "by_identity": dict(Counter(o.identity.value for o in occs)),
+                "by_extraction": by_extraction,
+                "by_identity": by_identity,
+                "by_discovery": by_discovery,
+                "by_classification": by_classification,
+                "by_local_copy": by_local_copy,
+                "by_retrieval": by_retrieval,
                 "by_access": dict(
                     Counter(o.classification.value if o.classification else "not_checked" for o in occs)
                 ),
-                "by_retrieval": dict(Counter(o.retrieval.value for o in occs)),
             },
-            sources_count=self.store.sources.list(pid, limit=1).total or 0,
-            recent_jobs=self._job_summaries(pid),
+            download_enabled=project.download_enabled,
+            sources_count=sources_count,
+            recent_jobs=recent_jobs,
             recent_artifacts=[self._descriptor(pid, a) for a in reversed(arts[-10:])],
         )
 
@@ -439,6 +542,58 @@ class RefCollectorServiceImpl:
         project = self._read(ctx, Scope.PROJECTS_READ, req.project_id)
         return self._meta(ctx, self._project_view(project), project.revision)
 
+    def rename_project(self, ctx: CallContext, req: api.RenameProjectIn) -> api.RenameProjectOut:
+        self._need(ctx, Scope.PROJECTS_WRITE)
+        new_name = req.name.strip()
+        if not new_name:
+            raise InvalidInput("Project name cannot be empty")
+        if not req.idempotency_key:
+            req = req.model_copy(update={"idempotency_key": new_id("request")})
+
+        def fn(tx: Tx, _: Any) -> api.RenameProjectOut:
+            project = tx.project
+            assert project is not None
+            updated = self.store.projects.update(project.model_copy(update={"name": new_name}))
+            tx.attach(updated)
+            tx.audit(AuditEventType.FIELDS_SET, project.project_id, name=new_name)
+            return api.RenameProjectOut(project_id=project.project_id, name=new_name, revision=tx.revision)
+
+        return self._mutate(ctx, "rename_project", req.project_id, req, api.RenameProjectOut, fn)
+
+    def get_project_consequences(
+        self, ctx: CallContext, req: api.GetProjectConsequencesIn
+    ) -> api.GetProjectConsequencesOut:
+        project = self._read(ctx, Scope.PROJECTS_READ, req.project_id)
+        paper_count, citation_count = self.store.projects.get_counts(req.project_id)
+        active_states = [s for s in JobState if s not in TERMINAL_JOB_STATES]
+        active = self.queue.list_all_jobs(project_id=req.project_id, states=active_states, limit=1).items
+        return self._meta(
+            ctx,
+            api.GetProjectConsequencesOut(
+                project_id=project.project_id,
+                name=project.name,
+                paper_count=paper_count,
+                citation_count=citation_count,
+                has_active_jobs=bool(active),
+            ),
+            project.revision,
+        )
+
+    def delete_project(self, ctx: CallContext, req: api.DeleteProjectIn) -> api.DeleteProjectOut:
+        self._need(ctx, Scope.PROJECTS_WRITE)
+        project = self._read(ctx, Scope.PROJECTS_WRITE, req.project_id)
+        active_states = [s for s in JobState if s not in TERMINAL_JOB_STATES]
+        active = self.queue.list_all_jobs(project_id=req.project_id, states=active_states, limit=1).items
+        if active:
+            job = active[0]
+            raise InvalidState(
+                f"Cannot delete project '{req.project_id}': active job {job.job_id} "
+                f"is in state {job.state.value}",
+                details={"project_id": req.project_id, "job_id": job.job_id, "state": job.state.value},
+            )
+        self.store.projects.delete(req.project_id)
+        return self._meta(ctx, api.DeleteProjectOut(project_id=req.project_id), project.revision)
+
     def update_project_settings(
         self, ctx: CallContext, req: api.UpdateProjectSettingsIn
     ) -> api.GetProjectOut:
@@ -505,6 +660,52 @@ class RefCollectorServiceImpl:
             )
         return path.read_bytes()
 
+    def _persist_source(
+        self,
+        tx: Tx,
+        project_id: str,
+        *,
+        sha: str,
+        kind: SourceType,
+        label: str,
+        origin: str,
+        preflight: Preflight,
+        tmp_path: Path | None = None,
+        raw_bytes: bytes | None = None,
+    ) -> api.ImportSourceOut:
+        known = self.store.sources.find_by_hash(project_id, sha)
+        if known is not None:
+            return api.ImportSourceOut(source_id=known.source_id, reused=True, preflight=known.preflight)
+        media_type = "application/pdf" if kind == SourceType.PDF else "text/plain"
+        if tmp_path is None:
+            suffix = ".pdf" if kind == SourceType.PDF else ".txt"
+            tmp_path = self.store.files.new_tmp_path(suffix)
+            assert raw_bytes is not None
+            tmp_path.write_bytes(raw_bytes)
+        blob = self.store.files.commit(tmp_path, media_type)
+        self.store.files.grant(project_id, blob.sha256)
+        source = self.store.sources.add(
+            Source(
+                source_id=new_id("source"),
+                project_id=project_id,
+                type=kind,
+                label=label,
+                sha256=sha,
+                origin=origin,
+                preflight=preflight,
+                sections=[s.model_copy() for s in preflight.sections],
+                imported_at=tx.now,
+            )
+        )
+        tx.audit(
+            AuditEventType.SOURCE_IMPORTED,
+            source.source_id,
+            sha256=sha,
+            type=kind.value,
+            label=label,
+        )
+        return api.ImportSourceOut(source_id=source.source_id, reused=False, preflight=preflight)
+
     def import_source(self, ctx: CallContext, req: api.ImportSourceIn) -> api.ImportSourceOut:
         self._need(ctx, Scope.SOURCES_IMPORT)
         spec = req.input
@@ -552,39 +753,16 @@ class RefCollectorServiceImpl:
             }
 
         def fn(tx: Tx, p: dict[str, Any]) -> api.ImportSourceOut:
-            pid = req.project_id
-            known = self.store.sources.find_by_hash(pid, p["sha"])
-            if known is not None:  # W-02
-                return api.ImportSourceOut(source_id=known.source_id, reused=True, preflight=known.preflight)
-            suffix = ".pdf" if p["kind"] == SourceType.PDF else ".txt"
-            tmp = self.store.files.new_tmp_path(suffix)
-            tmp.write_bytes(p["raw"])
-            blob = self.store.files.commit(
-                tmp, "application/pdf" if p["kind"] == SourceType.PDF else "text/plain"
-            )
-            self.store.files.grant(pid, blob.sha256)
-            preflight: Preflight = p["preflight"]
-            source = self.store.sources.add(
-                Source(
-                    source_id=new_id("source"),
-                    project_id=pid,
-                    type=p["kind"],
-                    label=p["label"],
-                    sha256=p["sha"],
-                    origin=p["origin"],
-                    preflight=preflight,
-                    sections=[s.model_copy() for s in preflight.sections],
-                    imported_at=tx.now,
-                )
-            )
-            tx.audit(
-                AuditEventType.SOURCE_IMPORTED,
-                source.source_id,
-                sha256=p["sha"],
-                type=p["kind"].value,
+            return self._persist_source(
+                tx,
+                req.project_id,
+                sha=p["sha"],
+                kind=p["kind"],
                 label=p["label"],
+                origin=p["origin"],
+                preflight=p["preflight"],
+                raw_bytes=p["raw"],
             )
-            return api.ImportSourceOut(source_id=source.source_id, reused=False, preflight=preflight)
 
         return self._mutate(
             ctx, "import_source", req.project_id, req, api.ImportSourceOut, fn, prepare=prepare
@@ -603,6 +781,7 @@ class RefCollectorServiceImpl:
             extraction_state=src.extraction_state,
             occurrence_count=count or 0,
             imported_at=src.imported_at,
+            sha256=src.sha256,
         )
 
     def list_sources(self, ctx: CallContext, req: api.ListSourcesIn) -> api.ListSourcesOut:
@@ -789,6 +968,8 @@ class RefCollectorServiceImpl:
                     failed_retryable=c.get("failed_retryable", 0),
                     failed_permanent=c.get("failed_permanent", 0),
                     skipped=c.get("skipped", 0),
+                    retry_wait=c.get("retry_wait", 0),
+                    cancelled=c.get("cancelled", 0),
                 )
             )
         artifact_ids, after = [], None
@@ -843,6 +1024,7 @@ class RefCollectorServiceImpl:
             identity=f.identity.value if f.identity else None,
             discovery=f.discovery.value if f.discovery else None,
             classification=f.classification.value if f.classification else None,
+            classification_is_null=f.classification_is_null,
             local_copy=f.local_copy.value if f.local_copy else None,
             retrieval=f.retrieval.value if f.retrieval else None,
             reason=f.reason,
@@ -923,6 +1105,8 @@ class RefCollectorServiceImpl:
         if "files" in want:
             files = self.store.work_files.list_for_work(pid, work.work_id) if work else []
             out.files = [f.model_dump(mode="json") for f in files]
+        if "citation_files" in want:
+            out.citation_files = [f.model_dump(mode="json") for f in self._current_citation_files(occ)]
         if "history" in want:
             events = [
                 (
@@ -1010,8 +1194,27 @@ class RefCollectorServiceImpl:
         )
 
     def review_decision(self, ctx: CallContext, req: api.ReviewDecisionIn) -> api.UpdateReferenceOut:
-        """TTY approval surface only (7.4): never reachable from MCP or a non-interactive CLI."""
-        if ctx.channel != Channel.CLI_TTY_REVIEW or not ctx.tty:
+        """TTY approval surface (7.4) or validated web review (Wave 3)."""
+        if ctx.channel == Channel.CLI_TTY_REVIEW and ctx.tty:
+            pass
+        elif ctx.channel == Channel.WEB_UI and ctx.review_grant is not None:
+            grant = ctx.review_grant
+            intent = self._intent_registry.get(grant.token)
+            if intent is None or intent.purpose != "review":
+                raise NotAuthorized("invalid or forged review grant")
+            if intent.status == "pending" and self.clock() > intent.expires_at:
+                raise NotAuthorized("review grant expired")
+            if (
+                intent.web_session_id != grant.web_session_id
+                or intent.principal != ctx.principal
+                or grant.project_id != req.project_id
+                or grant.occurrence_id != req.occurrence_id
+                or grant.candidate_id != req.candidate_id
+                or grant.action != req.action
+                or grant.expected_revision != req.expected_revision
+            ):
+                raise NotAuthorized("review grant does not match request")
+        else:
             raise NotAuthorized("accepting with user approval needs the interactive review surface")
         self._need(ctx, Scope.REFERENCES_WRITE)
 
@@ -1068,6 +1271,44 @@ class RefCollectorServiceImpl:
         )
         return self._meta(ctx, out)
 
+    def _apply_attachment(
+        self,
+        tx: Tx,
+        project_id: str,
+        occurrence_id: str,
+        *,
+        attached: LocalCopy,
+        any_usable: bool,
+        checked_work: ProjectWork,
+        checked_policy: VersionPolicy,
+    ) -> api.AttachFileOut:
+        occ = self.store.occurrences.get(project_id, occurrence_id)
+        if occ.identity not in ACCEPTED_IDENTITIES or not occ.work_id:
+            raise PrerequisiteNotMet("attach_file needs an accepted identity")
+        assert tx.project is not None
+        current_work = self.store.works.get(project_id, occ.work_id)
+        if (
+            occ.work_id != checked_work.work_id
+            or current_work.metadata != checked_work.metadata
+            or current_work.overrides != checked_work.overrides
+            or tx.project.version_policy != checked_policy
+        ):
+            raise RevisionConflict("attachment identity or version policy changed; evaluate again")
+        copy = self.store.local_copies.add(attached.model_copy(update={"occurrence_id": occ.occurrence_id}))
+        occ.local_copy = LocalCopyState.USABLE if any_usable else copy.state
+        if copy.state == LocalCopyState.USABLE:  # all five checks pass: no download (AT-26, W-22)
+            occ.retrieval = RetrievalState.SATISFIED_BY_LOCAL_COPY
+        changes.rebase(occ)  # a local copy changes neither text, candidates nor fields
+        changes.save(self, occ)
+        tx.audit(
+            AuditEventType.LOCAL_COPY_EVALUATED,
+            occ.occurrence_id,
+            local_copy_id=copy.local_copy_id,
+            state=copy.state.value,
+            failed_check=copy.failed_check.value if copy.failed_check else None,
+        )
+        return api.AttachFileOut(local_copy_id=copy.local_copy_id, checks=copy.checks, local_copy=copy.state)
+
     def attach_file(self, ctx: CallContext, req: api.AttachFileIn) -> api.AttachFileOut:
         self._need(ctx, Scope.FILES_ATTACH)
 
@@ -1092,35 +1333,14 @@ class RefCollectorServiceImpl:
 
         def fn(tx: Tx, prepared: Any) -> api.AttachFileOut:
             attached, any_usable, checked_work, checked_policy = prepared
-            occ = self.store.occurrences.get(req.project_id, req.occurrence_id)
-            if occ.identity not in ACCEPTED_IDENTITIES or not occ.work_id:
-                raise PrerequisiteNotMet("attach_file needs an accepted identity")
-            assert tx.project is not None
-            current_work = self.store.works.get(req.project_id, occ.work_id)
-            if (
-                occ.work_id != checked_work.work_id
-                or current_work.metadata != checked_work.metadata
-                or current_work.overrides != checked_work.overrides
-                or tx.project.version_policy != checked_policy
-            ):
-                raise RevisionConflict("attachment identity or version policy changed; evaluate again")
-            copy = self.store.local_copies.add(
-                attached.model_copy(update={"occurrence_id": occ.occurrence_id})
-            )
-            occ.local_copy = LocalCopyState.USABLE if any_usable else copy.state
-            if copy.state == LocalCopyState.USABLE:  # all five checks pass: no download (AT-26, W-22)
-                occ.retrieval = RetrievalState.SATISFIED_BY_LOCAL_COPY
-            changes.rebase(occ)  # a local copy changes neither text, candidates nor fields
-            changes.save(self, occ)
-            tx.audit(
-                AuditEventType.LOCAL_COPY_EVALUATED,
-                occ.occurrence_id,
-                local_copy_id=copy.local_copy_id,
-                state=copy.state.value,
-                failed_check=copy.failed_check.value if copy.failed_check else None,
-            )
-            return api.AttachFileOut(
-                local_copy_id=copy.local_copy_id, checks=copy.checks, local_copy=copy.state
+            return self._apply_attachment(
+                tx,
+                req.project_id,
+                req.occurrence_id,
+                attached=attached,
+                any_usable=any_usable,
+                checked_work=checked_work,
+                checked_policy=checked_policy,
             )
 
         return self._mutate(ctx, "attach_file", req.project_id, req, api.AttachFileOut, fn, prepare=prepare)
@@ -1137,23 +1357,32 @@ class RefCollectorServiceImpl:
             if project.network_mode != NetworkMode.RETRIEVAL:
                 raise NetworkModeDenied("project network mode is not retrieval")
             self._require_email()
+            if req.retrieval_basis == "citation_doi":
+                if not self.settings.pdf_fallback_url:
+                    raise InvalidInput("Citation DOI retrieval requires a configured trusted fallback")
+                if req.version_policy != VersionPolicy.ANY_ELIGIBLE:
+                    raise InvalidInput("Citation DOI retrieval requires explicit any_eligible version policy")
+            eligible = self._doi_downloadable if req.retrieval_basis == "citation_doi" else self._downloadable
             scope = req.scope
             if isinstance(scope, api.OccurrenceScope):
                 occs = self.store.occurrences.get_many(req.project_id, scope.occurrence_ids)
-                bad = [o.occurrence_id for o in occs if not self._downloadable(o)]
+                bad = [o.occurrence_id for o in occs if not eligible(o)]
                 if bad:
                     raise PrerequisiteNotMet(
-                        "identity must be accepted and discovery run", details={"occurrence_ids": bad}
+                        "citation DOI must be unique and active"
+                        if req.retrieval_basis == "citation_doi"
+                        else "identity must be accepted and discovery run",
+                        details={"occurrence_ids": bad},
                     )
             else:
                 occs = [
                     o
                     for o in self.all_occurrences(req.project_id, self._query(req.project_id, scope.filter))
-                    if self._downloadable(o)
+                    if eligible(o)
                 ]
                 if not occs:
                     raise PrerequisiteNotMet(
-                        "no occurrence in scope has an accepted identity and a discovery run"
+                        "no eligible occurrence in scope for the requested retrieval basis"
                     )
             return [o.occurrence_id for o in occs]
 
@@ -1161,11 +1390,23 @@ class RefCollectorServiceImpl:
             ids = validate()
             budget = req.budget.model_dump(exclude_none=True) if req.budget else {}
             options: dict[str, Any] = {"budget": budget}
+            stage = StepType.RETRIEVE
+            if req.retrieval_basis == "citation_doi":
+                stage = StepType.RETRIEVE_DOI
+                options["doi_targets"] = {
+                    oid: {
+                        "doi": unique_doi(occ.text),
+                        "revision": occ.revision,
+                        "text_sha256": hashlib.sha256(occ.text.encode("utf-8")).hexdigest(),
+                    }
+                    for oid in ids
+                    for occ in [self.store.occurrences.get(req.project_id, oid)]
+                }
             if req.version_policy:
                 options["version_policy"] = req.version_policy.value
             job = self._enqueue(
                 tx,
-                [StepType.RETRIEVE],
+                [stage],
                 {"occurrence_ids": ids},
                 options,
                 link=ids,
@@ -1174,6 +1415,10 @@ class RefCollectorServiceImpl:
             return api.JobOut(job_id=job.job_id)
 
         return self._mutate(ctx, "download_files", req.project_id, req, api.JobOut, fn, bump=False)
+
+    @staticmethod
+    def _doi_downloadable(o: Occurrence) -> bool:
+        return o.extraction != ExtractionState.EXCLUDED and unique_doi(o.text) is not None
 
     @staticmethod
     def _downloadable(o: Occurrence) -> bool:
@@ -1267,5 +1512,1311 @@ class RefCollectorServiceImpl:
                     "length cannot hold one complete UTF-8 character",
                     recovery_hint="Increase length to at least 4 bytes (within the server limit) and retry.",
                 )
+            out.next_offset = req.offset + consumed
             out.eof = req.offset + consumed >= size
         return self._meta(ctx, out, project.revision)
+
+    # ================================================================ Section 10 additions
+
+    def list_jobs(self, ctx: CallContext, req: api.ListJobsIn) -> api.ListJobsOut:
+        self._need(ctx, Scope.PROJECTS_READ)
+        if req.project_id:
+            self.store.projects.get(req.project_id)
+        after, sk = self._after(
+            req.cursor,
+            "list_jobs",
+            req.project_id,
+            [s.value for s in req.states] if req.states else None,
+        )
+        page = self.queue.list_all_jobs(
+            project_id=req.project_id,
+            states=req.states,
+            after=after,
+            limit=self._limit(req.limit),
+        )
+        project_names: dict[str, str] = {}
+        items: list[api.JobListItem] = []
+        for j in page.items:
+            if j.project_id not in project_names:
+                try:
+                    p = self.store.projects.get(j.project_id)
+                    project_names[j.project_id] = p.name
+                except NotFound:
+                    project_names[j.project_id] = "unknown"
+            items.append(
+                api.JobListItem(
+                    project_id=j.project_id,
+                    project_name=project_names[j.project_id],
+                    job_id=j.job_id,
+                    state=j.state,
+                    stages=[s.value for s in j.stages],
+                    created_at=j.created_at,
+                    updated_at=j.updated_at,
+                )
+            )
+        out = api.ListJobsOut(
+            jobs=items,
+            next_cursor=encode_cursor(page.next_after, sk, self.clock()),
+        )
+        return self._meta(ctx, out)
+
+    def list_global_artifacts(
+        self, ctx: CallContext, req: api.ListGlobalArtifactsIn
+    ) -> api.ListGlobalArtifactsOut:
+        self._need(ctx, Scope.PROJECTS_READ)
+        after, sk = self._after(req.cursor, "list_global_artifacts", req.kind)
+        page = self.store.artifacts.list_global(kind=req.kind, after=after, limit=self._limit(req.limit))
+        project_names: dict[str, str] = {}
+        items: list[api.GlobalArtifactItem] = []
+        for a in page.items:
+            if a.project_id not in project_names:
+                try:
+                    p = self.store.projects.get(a.project_id)
+                    project_names[a.project_id] = p.name
+                except NotFound:
+                    project_names[a.project_id] = "unknown"
+            items.append(
+                api.GlobalArtifactItem(
+                    project_id=a.project_id,
+                    project_name=project_names[a.project_id],
+                    descriptor=self._descriptor(a.project_id, a),
+                )
+            )
+        out = api.ListGlobalArtifactsOut(
+            artifacts=items,
+            next_cursor=encode_cursor(page.next_after, sk, self.clock()),
+        )
+        return self._meta(ctx, out)
+
+    def get_executor_status(self, ctx: CallContext, req: api.GetExecutorStatusIn) -> api.GetExecutorStatusOut:
+        self._need(ctx, Scope.PROJECTS_READ)
+        now = self.clock()
+        executor = getattr(self, "executor", None)
+        if executor is not None and getattr(executor, "is_owner", False):
+            out = api.GetExecutorStatusOut(
+                state="owned",
+                owner_id=executor.executor_id,
+                owner_pid=os.getpid(),
+                heartbeat_at=None,
+                observed_at=now,
+                is_local_owner=True,
+            )
+            return self._meta(ctx, out)
+
+        db = getattr(self.store, "db", None) or getattr(self.queue, "db", None)
+        if db is None:
+            out = api.GetExecutorStatusOut(
+                state="unowned",
+                owner_id=None,
+                owner_pid=None,
+                heartbeat_at=None,
+                observed_at=now,
+                is_local_owner=False,
+            )
+            return self._meta(ctx, out)
+
+        row = db.query_one(
+            "SELECT id, pid, started_at, stopped_at FROM executor ORDER BY started_at DESC LIMIT 1"
+        )
+        if row is None or row["stopped_at"] is not None:
+            out = api.GetExecutorStatusOut(
+                state="unowned",
+                owner_id=None,
+                owner_pid=None,
+                heartbeat_at=None,
+                observed_at=now,
+                is_local_owner=False,
+            )
+            return self._meta(ctx, out)
+
+        pid = int(row["pid"])
+        # An active row cannot prove ownership without a lease heartbeat. Never
+        # signal a PID to inspect it: os.kill(pid, 0) is unsafe on Windows.
+        out = api.GetExecutorStatusOut(
+            state="unknown",
+            owner_id=str(row["id"]),
+            owner_pid=pid,
+            heartbeat_at=None,
+            observed_at=now,
+            is_local_owner=False,
+        )
+        return self._meta(ctx, out)
+
+    def project_file_path(self, ctx: CallContext, project_id: str, kind: str, resource_id: str) -> Path:
+        if kind in ("source", "work_file", "local_copy", "citation_file"):
+            self._need(ctx, Scope.REFERENCES_READ)
+        elif kind == "artifact":
+            self._need(ctx, Scope.PROJECTS_READ)
+        else:
+            raise InvalidInput(f"unsupported kind {kind}")
+
+        self.store.projects.get(project_id)
+        if kind == "source":
+            source = self.store.sources.get(project_id, resource_id)
+            sha = source.sha256
+        elif kind == "work_file":
+            wf = self.store.work_files.get(project_id, resource_id)
+            sha = wf.sha256
+        elif kind == "citation_file":
+            cf = self.store.citation_files.get(project_id, resource_id)
+            occ = self.store.occurrences.get(project_id, cf.occurrence_id)
+            if not cf.is_current(occ):
+                raise NotFound("Citation file no longer matches the current citation")
+            sha = cf.sha256
+        elif kind == "local_copy":
+            lc = self.store.local_copies.get(project_id, resource_id)
+            sha = lc.sha256
+            if not sha:
+                raise NotFound("file content is missing", details={"resource_id": resource_id})
+        elif kind == "artifact":
+            art = self.store.artifacts.get(project_id, resource_id)
+            sha = art.sha256
+        else:
+            raise InvalidInput(f"unsupported kind {kind}")
+
+        try:
+            path = self.store.files.path_for(project_id, sha).resolve()
+        except NotFound:
+            raise NotFound("file content is missing", details={"resource_id": resource_id}) from None
+
+        rc_home = self.settings.rc_home.resolve()
+        if not path.is_relative_to(rc_home):
+            raise PathNotAllowed("file is outside RC_HOME", details={"resource_id": resource_id})
+
+        if not path.is_file():
+            raise NotFound("file not found on disk", details={"resource_id": resource_id})
+
+        return path
+
+    def read_project_file(self, ctx: CallContext, req: api.ReadProjectFileIn) -> api.ReadProjectFileOut:
+        if req.kind in ("source", "work_file", "local_copy", "citation_file"):
+            self._need(ctx, Scope.REFERENCES_READ)
+        elif req.kind == "artifact":
+            self._need(ctx, Scope.PROJECTS_READ)
+        else:
+            raise InvalidInput(f"unsupported kind {req.kind}")
+
+        project = self.store.projects.get(req.project_id)
+        if req.kind == "source":
+            source = self.store.sources.get(req.project_id, req.resource_id)
+            sha = source.sha256
+            name = source.label
+            media_type = "application/pdf" if source.type == SourceType.PDF else "text/plain"
+        elif req.kind == "work_file":
+            wf = self.store.work_files.get(req.project_id, req.resource_id)
+            sha = wf.sha256
+            name = wf.export_name or f"{wf.work_file_id}.pdf"
+            media_type = "application/pdf"
+        elif req.kind == "citation_file":
+            cf = self.store.citation_files.get(req.project_id, req.resource_id)
+            sha = cf.sha256
+            name = cf.export_name
+            media_type = "application/pdf"
+        elif req.kind == "local_copy":
+            lc = self.store.local_copies.get(req.project_id, req.resource_id)
+            sha = lc.sha256
+            if not sha:
+                raise NotFound("file content is missing", details={"resource_id": req.resource_id})
+            name = f"{lc.local_copy_id}.pdf"
+            media_type = "application/pdf"
+        elif req.kind == "artifact":
+            art = self.store.artifacts.get(req.project_id, req.resource_id)
+            sha = art.sha256
+            name = art.name
+            media_type = art.media_type
+        else:
+            raise InvalidInput(f"unsupported kind {req.kind}")
+
+        path = self.project_file_path(ctx, req.project_id, req.kind, req.resource_id)
+
+        with path.open("rb") as f:
+            actual_sha = hashlib.file_digest(f, "sha256").hexdigest()
+        if actual_sha != sha:
+            raise FileValidationFailed(
+                f"storage integrity violation: file hash {actual_sha} does not match expected {sha}",
+                details={"expected_sha256": sha, "actual_sha256": actual_sha},
+            )
+
+        total_bytes = path.stat().st_size
+        if req.offset > total_bytes:
+            raise InvalidInput(
+                f"offset {req.offset} exceeds file size {total_bytes}",
+                details={"offset": req.offset, "total_bytes": total_bytes},
+            )
+
+        if req.offset == total_bytes:
+            data = b""
+            next_offset = req.offset
+            eof = True
+        else:
+            with path.open("rb") as f:
+                f.seek(req.offset)
+                data = f.read(req.length)
+            next_offset = req.offset + len(data)
+            eof = next_offset >= total_bytes
+
+        descriptor = api.ProjectFileDescriptor(
+            resource_id=req.resource_id,
+            kind=req.kind,
+            name=name,
+            media_type=media_type,
+            bytes=total_bytes,
+            sha256=sha,
+        )
+        out = api.ReadProjectFileOut(
+            descriptor=descriptor,
+            data=data,
+            next_offset=next_offset,
+            eof=eof,
+        )
+        return self._meta(ctx, out, project.revision)
+
+    def upload_pdf(self, ctx: CallContext, req: api.UploadPdfIn, body: BinaryIO) -> api.UploadPdfOut:
+        """Upload a PDF for source import or local-copy attachment (spec 10.3, D-39)."""
+        if req.purpose == "source":
+            self._need(ctx, Scope.SOURCES_IMPORT)
+        elif req.purpose == "local_copy":
+            self._need(ctx, Scope.FILES_ATTACH)
+            if not req.occurrence_id:
+                raise InvalidInput("occurrence_id is required for local_copy upload")
+        else:
+            raise InvalidInput(f"unknown purpose: {req.purpose}")
+
+        # Validate display name as a safe leaf name
+        if not req.name or not req.name.strip():
+            raise InvalidInput("name cannot be empty or blank")
+        if "/" in req.name or "\\" in req.name:
+            raise InvalidInput("name must not contain path separators")
+        if ".." in req.name or req.name in (".", ".."):
+            raise InvalidInput("name must not contain path traversal")
+        if any(ord(c) < 32 or ord(c) == 127 for c in req.name):
+            raise InvalidInput("name must not contain control characters")
+
+        # Bounds on declared size
+        if req.declared_bytes < 0:
+            raise InvalidInput("declared_bytes cannot be negative")
+        if req.declared_bytes > self.settings.limits.pdf_bytes:
+            raise LimitExceeded(
+                "declared_bytes exceeds PDF limit",
+                details={"limit": self.settings.limits.pdf_bytes, "declared": req.declared_bytes},
+            )
+
+        # Validate project
+        project = self.store.projects.get(req.project_id)
+
+        # Early validation for local_copy
+        work = None
+        if req.purpose == "local_copy":
+            occ = self.store.occurrences.get(req.project_id, req.occurrence_id)
+            if occ.identity not in ACCEPTED_IDENTITIES or not occ.work_id:
+                raise PrerequisiteNotMet("attach_file needs an accepted identity")
+            work = self.store.works.get(req.project_id, occ.work_id)
+
+        tmp = self.store.files.new_tmp_path(".pdf")
+        try:
+            hasher = hashlib.sha256()
+            actual_bytes = 0
+            chunk_size = 65536
+            first_chunk = True
+
+            with tmp.open("wb") as f:
+                while True:
+                    chunk = body.read(chunk_size)
+                    if not chunk:
+                        break
+                    if first_chunk:
+                        first_chunk = False
+                        if not chunk.startswith(b"%PDF"):
+                            raise UnsupportedSource("uploaded file is not a PDF")
+                    actual_bytes += len(chunk)
+                    if actual_bytes > self.settings.limits.pdf_bytes:
+                        raise LimitExceeded(
+                            "file exceeds PDF limit",
+                            details={"limit": self.settings.limits.pdf_bytes, "actual": actual_bytes},
+                        )
+                    if actual_bytes > req.declared_bytes:
+                        raise LimitExceeded(
+                            "file exceeds declared_bytes",
+                            details={"declared": req.declared_bytes, "actual": actual_bytes},
+                        )
+                    hasher.update(chunk)
+                    f.write(chunk)
+
+            if first_chunk or actual_bytes == 0:
+                raise UnsupportedSource("uploaded file is empty or not a PDF")
+
+            if actual_bytes != req.declared_bytes:
+                raise InvalidInput(
+                    "actual bytes does not match declared_bytes",
+                    details={"declared": req.declared_bytes, "actual": actual_bytes},
+                )
+
+            actual_sha = hasher.hexdigest()
+            fp = hashlib.sha256((fingerprint(req) + ":" + actual_sha).encode("utf-8")).hexdigest()
+
+            # Check idempotency replay before mutation
+            rec = self.store.idempotency.get(
+                ctx.principal, req.project_id, "upload_pdf", req.idempotency_key, now=self.clock()
+            )
+            if rec is not None:
+                if rec.fingerprint != fp:
+                    raise IdempotencyConflict(
+                        f"key {req.idempotency_key} was used with a different request or payload"
+                    )
+                return api.UploadPdfOut.model_validate(rec.result)
+
+            if req.purpose == "source":
+                known = self.store.sources.find_by_hash(req.project_id, actual_sha)
+                if known is not None:
+                    preflight = known.preflight
+                else:
+                    data = tmp.read_bytes()
+                    preflight = self.extractor.preflight(data, SourceType.PDF)
+
+                def fn_source(tx: Tx, _prep: Any) -> api.UploadPdfOut:
+                    src_out = self._persist_source(
+                        tx,
+                        req.project_id,
+                        sha=actual_sha,
+                        kind=SourceType.PDF,
+                        label=req.name,
+                        origin="uploaded",
+                        preflight=preflight,
+                        tmp_path=tmp,
+                    )
+                    return api.UploadPdfOut(source=src_out, attachment=None)
+
+                return self._mutate(
+                    ctx,
+                    "upload_pdf",
+                    req.project_id,
+                    req,
+                    api.UploadPdfOut,
+                    fn_source,
+                    fingerprint_override=fp,
+                )
+
+            else:  # req.purpose == "local_copy"
+                assert work is not None
+                rows = self.local_copies.evaluate(
+                    req.project_id,
+                    work,
+                    version_policy=project.version_policy,
+                    attached_path=tmp,
+                    version_hint=req.version_hint,
+                )
+                attached = next((r for r in rows if r.origin == LocalCopyOrigin.USER_ATTACHED), None)
+                if attached is None:
+                    raise InvalidState("the attachment was not evaluated")
+                any_usable = any(r.state == LocalCopyState.USABLE for r in rows)
+                checked_work = work
+                checked_policy = project.version_policy
+
+                def fn_attach(tx: Tx, _prep: Any) -> api.UploadPdfOut:
+                    attach_out = self._apply_attachment(
+                        tx,
+                        req.project_id,
+                        req.occurrence_id,
+                        attached=attached,
+                        any_usable=any_usable,
+                        checked_work=checked_work,
+                        checked_policy=checked_policy,
+                    )
+                    return api.UploadPdfOut(source=None, attachment=attach_out)
+
+                return self._mutate(
+                    ctx,
+                    "upload_pdf",
+                    req.project_id,
+                    req,
+                    api.UploadPdfOut,
+                    fn_attach,
+                    fingerprint_override=fp,
+                )
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def render_source_page(self, ctx: CallContext, req: api.RenderSourcePageIn) -> api.RenderSourcePageOut:
+        """Render a source PDF page as a raster PNG.
+
+        Coordinates and overlay limitation:
+        PyMuPDF user coordinates for page.rect account for page rotation
+        (page.rotation in {0, 90, 180, 270}). The extraction adapter
+        (extraction/layout.py) normalizes unrotated text bboxes relative to
+        page.rect dimensions. On unrotated pages (rotation == 0), normalized
+        bounding boxes [x0, y0, x1, y1] map directly to raster pixel coordinates:
+            px0 = x0 * width
+            py0 = y0 * height
+            pw  = (x1 - x0) * width
+            ph  = (y1 - y0) * height
+        On rotated pages, direct visual overlay is not supported;
+        `span_overlay_supported` is set to False to report this limitation.
+        """
+        self._need(ctx, Scope.REFERENCES_READ)
+
+        if not math.isfinite(req.scale) or not (0.5 <= req.scale <= 2.0):
+            raise InvalidInput("scale must be a finite float between 0.5 and 2.0")
+
+        project = self.store.projects.get(req.project_id)
+        source = self.store.sources.get(req.project_id, req.source_id)
+
+        if source.type != SourceType.PDF:
+            raise UnsupportedSource(
+                "source is not a PDF",
+                details={"type": source.type.value if hasattr(source.type, "value") else str(source.type)},
+            )
+
+        if req.page_index < 0 or req.page_index >= source.preflight.pages:
+            raise InvalidInput(
+                f"page index {req.page_index} out of bounds (total pages: {source.preflight.pages})",
+                details={"page_index": req.page_index, "pages": source.preflight.pages},
+            )
+
+        try:
+            path = self.store.files.path_for(req.project_id, source.sha256).resolve()
+        except NotFound:
+            raise NotFound("source content is missing", details={"source_id": req.source_id}) from None
+
+        rc_home = self.settings.rc_home.resolve()
+        if not path.is_relative_to(rc_home):
+            raise PathNotAllowed("file is outside RC_HOME", details={"source_id": req.source_id})
+
+        if not path.is_file():
+            raise NotFound("file not found on disk", details={"source_id": req.source_id})
+
+        with path.open("rb") as f:
+            actual_sha = hashlib.file_digest(f, "sha256").hexdigest()
+        if actual_sha != source.sha256:
+            raise FileValidationFailed(
+                f"storage integrity violation: hash {actual_sha} does not match {source.sha256}",
+                details={"expected_sha256": source.sha256, "actual_sha256": actual_sha},
+            )
+
+        try:
+            with pymupdf.open(path) as doc:
+                if not doc.is_pdf:
+                    raise UnsupportedSource("stored file is not a PDF")
+                if doc.is_encrypted:
+                    raise EncryptedDocument()
+                if req.page_index >= len(doc):
+                    raise InvalidInput(
+                        f"page index {req.page_index} out of bounds (total pages: {len(doc)})",
+                        details={"page_index": req.page_index, "pages": len(doc)},
+                    )
+                page = doc.load_page(req.page_index)
+                matrix = pymupdf.Matrix(req.scale, req.scale)
+                target_rect = (page.rect * matrix).round()
+                target_width = target_rect.width
+                target_height = target_rect.height
+                if target_width <= 0 or target_height <= 0:
+                    raise InvalidInput("invalid rendered page dimensions")
+                pixels = target_width * target_height
+                if pixels > 8_000_000:
+                    raise LimitExceeded(
+                        "raster dimensions exceed 8 million pixels",
+                        details={
+                            "width": target_width,
+                            "height": target_height,
+                            "pixels": pixels,
+                            "limit": 8_000_000,
+                        },
+                    )
+                pix = page.get_pixmap(matrix=matrix, alpha=False)
+                png_data = pix.tobytes("png")
+                span_overlay_supported = page.rotation == 0
+                out = api.RenderSourcePageOut(
+                    data=png_data,
+                    media_type="image/png",
+                    page_index=req.page_index,
+                    width=pix.width,
+                    height=pix.height,
+                    span_overlay_supported=span_overlay_supported,
+                )
+                return self._meta(ctx, out, project.revision)
+        except (pymupdf.FileDataError, pymupdf.EmptyFileError) as exc:
+            raise UnsupportedSource("could not read PDF data") from exc
+
+    # ================================================================ Wave 3: trusted review and web settings
+
+    def _fingerprint_web_settings(self, rc_home: Path, req: api.UpdateWebSettingsIn) -> str:
+        c = req.change
+        if isinstance(c, api.SetProviderKeyChange):
+            secret_digest = keyed_secret_digest(rc_home, c.value.get_secret_value())
+            payload = {
+                "expected_settings_revision": req.expected_settings_revision,
+                "change": {
+                    "type": c.type,
+                    "provider": c.provider,
+                    "secret_digest": secret_digest,
+                },
+            }
+            canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        return fingerprint(req)
+
+    def prepare_web_review(self, ctx: CallContext, req: api.ReviewDecisionIn) -> api.WebIntentOut:
+        if ctx.channel != Channel.WEB_UI or not ctx.web_session_id:
+            raise NotAuthorized("web review intent requires Channel.WEB_UI and an active web session")
+        self._need(ctx, Scope.REFERENCES_WRITE)
+
+        project = self.store.projects.get(req.project_id)
+        occ = self.store.occurrences.get(req.project_id, req.occurrence_id)
+        if occ.revision != req.expected_revision:
+            raise RevisionConflict(
+                "occurrence revision has changed",
+                details={"current_revisions": {req.occurrence_id: occ.revision}},
+            )
+        if occ.extraction == ExtractionState.EXCLUDED:
+            raise InvalidState(f"{req.occurrence_id} is excluded", recovery_hint="Restore it first.")
+        cand = self.store.candidates.get(req.project_id, req.candidate_id)
+        if cand.occurrence_id != req.occurrence_id:
+            raise NotFound(f"candidate {req.candidate_id} not found on occurrence {req.occurrence_id}")
+        if req.action == "accept" and cand.rejected:
+            raise InvalidState("candidate was rejected and cannot be accepted")
+
+        summary = {
+            "project_id": req.project_id,
+            "occurrence_id": req.occurrence_id,
+            "action": req.action,
+            "candidate_id": req.candidate_id,
+            "expected_revision": req.expected_revision,
+            "citation_text": occ.text,
+            "candidate": {
+                "candidate_id": cand.candidate_id,
+                "title": cand.metadata.title,
+                "authors": [
+                    a.model_dump(mode="json") if hasattr(a, "model_dump") else str(a)
+                    for a in cand.metadata.authors
+                ],
+                "year": cand.metadata.year,
+                "doi": cand.metadata.doi,
+                "reasons": list(cand.reasons),
+            },
+            "note": req.note,
+        }
+        fp = fingerprint(req)
+        now = self.clock()
+        record = self._intent_registry.register(
+            purpose="review",
+            principal=ctx.principal,
+            web_session_id=ctx.web_session_id,
+            project_id=req.project_id,
+            target_id=req.occurrence_id,
+            candidate_id=req.candidate_id,
+            action=req.action,
+            expected_revision=req.expected_revision,
+            idempotency_key=req.idempotency_key,
+            fingerprint=fp,
+            summary=summary,
+            now=now,
+        )
+        out = api.WebIntentOut(
+            confirmation_token=record.token,
+            expires_at=record.expires_at,
+            purpose="review",
+            summary=summary,
+        )
+        return self._meta(ctx, out, project.revision)
+
+    def confirm_web_review(
+        self, ctx: CallContext, req: api.ReviewDecisionIn, confirmation_token: str
+    ) -> api.UpdateReferenceOut:
+        if ctx.channel != Channel.WEB_UI or not ctx.web_session_id:
+            raise NotAuthorized("web review confirmation requires Channel.WEB_UI and an active web session")
+        self._need(ctx, Scope.REFERENCES_WRITE)
+
+        if not confirmation_token or not confirmation_token.strip():
+            raise NotAuthorized("confirmation token required")
+
+        intent = self._intent_registry.get(confirmation_token)
+        if intent is None:
+            raise NotAuthorized("invalid or unknown confirmation token")
+
+        if intent.purpose != "review":
+            raise NotAuthorized("token purpose mismatch")
+        if intent.web_session_id != ctx.web_session_id:
+            raise NotAuthorized("token belongs to another session")
+        if intent.principal != ctx.principal:
+            raise NotAuthorized("token belongs to another principal")
+
+        fp = fingerprint(req)
+        if (
+            intent.project_id != req.project_id
+            or intent.target_id != req.occurrence_id
+            or intent.candidate_id != req.candidate_id
+            or intent.action != req.action
+            or intent.expected_revision != req.expected_revision
+            or intent.idempotency_key != req.idempotency_key
+            or intent.fingerprint != fp
+        ):
+            raise NotAuthorized("request does not match confirmed intent")
+
+        if intent.status == "pending" and self.clock() > intent.expires_at:
+            raise NotAuthorized("confirmation token expired")
+
+        grant = api.ReviewGrant(
+            token=confirmation_token,
+            web_session_id=ctx.web_session_id,
+            project_id=req.project_id,
+            occurrence_id=req.occurrence_id,
+            candidate_id=req.candidate_id,
+            action=req.action,
+            expected_revision=req.expected_revision,
+            expires_at=intent.expires_at,
+            fingerprint=fp,
+        )
+        authed_ctx = dataclasses.replace(ctx, review_grant=grant)
+        out = self.review_decision(authed_ctx, req)
+        self._intent_registry.mark_completed(confirmation_token)
+        return out
+
+    def _file_review_target(self, occ: Occurrence, req: api.ReviewFileDecisionIn):
+        if req.file_kind == "citation_file":
+            file = self.store.citation_files.get(req.project_id, req.work_file_id)
+            if (
+                not file.is_current(occ)
+                or file.state != RetrievalState.NEEDS_REVIEW
+                or file.verification_evidence.get("readable") is not True
+            ):
+                raise InvalidInput("Citation file is not a current readable PDF pending review")
+            return file
+        if occ.identity not in ACCEPTED_IDENTITIES or not occ.work_id:
+            raise InvalidInput("occurrence has no accepted work")
+        wf = self.store.work_files.get(req.project_id, req.work_file_id)
+        if wf.work_id != occ.work_id or wf.state != RetrievalState.NEEDS_REVIEW:
+            raise InvalidInput(
+                f"work file {req.work_file_id} does not belong to occurrence "
+                f"{req.occurrence_id} accepted work or is not in needs_review state"
+            )
+        return wf
+
+    def prepare_web_file_review(self, ctx: CallContext, req: api.ReviewFileDecisionIn) -> api.WebIntentOut:
+        if ctx.channel != Channel.WEB_UI or not ctx.web_session_id:
+            raise NotAuthorized("web file review intent requires Channel.WEB_UI and an active web session")
+        self._need(ctx, Scope.REFERENCES_WRITE)
+
+        project = self.store.projects.get(req.project_id)
+        occ = self.store.occurrences.get(req.project_id, req.occurrence_id)
+        if occ.revision != req.expected_revision:
+            raise RevisionConflict(
+                "occurrence revision has changed",
+                details={"current_revisions": {req.occurrence_id: occ.revision}},
+            )
+        if occ.extraction == ExtractionState.EXCLUDED:
+            raise InvalidState(f"{req.occurrence_id} is excluded", recovery_hint="Restore it first.")
+        wf = self._file_review_target(occ, req)
+        work = self.store.works.get(req.project_id, occ.work_id) if req.file_kind == "work_file" else None
+        host = urlparse(wf.source_url or wf.final_url or "").netloc
+        work_title = (
+            work.metadata.title
+            if work and work.metadata
+            else f"DOI {wf.target_doi}"
+            if req.file_kind == "citation_file"
+            else ""
+        )
+
+        summary = {
+            "project_id": req.project_id,
+            "occurrence_id": req.occurrence_id,
+            "work_file_id": req.work_file_id,
+            "file_kind": req.file_kind,
+            "action": req.action,
+            "expected_revision": req.expected_revision,
+            "file": {
+                "size": wf.bytes,
+                "host": host,
+                "source_url": wf.source_url,
+                "final_url": wf.final_url,
+                "failed_reasons": list(wf.reasons),
+            },
+            "work_title": work_title,
+            "note": req.note,
+        }
+        fp = fingerprint(req)
+        now = self.clock()
+        record = self._intent_registry.register(
+            purpose="file_review",
+            principal=ctx.principal,
+            web_session_id=ctx.web_session_id,
+            project_id=req.project_id,
+            target_id=req.occurrence_id,
+            candidate_id=req.work_file_id,
+            action=req.action,
+            expected_revision=req.expected_revision,
+            idempotency_key=req.idempotency_key,
+            fingerprint=fp,
+            summary=summary,
+            now=now,
+        )
+        out = api.WebIntentOut(
+            confirmation_token=record.token,
+            expires_at=record.expires_at,
+            purpose="file_review",
+            summary=summary,
+        )
+        return self._meta(ctx, out, project.revision)
+
+    def confirm_web_file_review(
+        self, ctx: CallContext, req: api.ReviewFileDecisionIn, confirmation_token: str
+    ) -> api.ReviewFileDecisionOut:
+        if ctx.channel != Channel.WEB_UI or not ctx.web_session_id:
+            raise NotAuthorized(
+                "web file review confirmation requires Channel.WEB_UI and an active web session"
+            )
+        self._need(ctx, Scope.REFERENCES_WRITE)
+
+        if not confirmation_token or not confirmation_token.strip():
+            raise NotAuthorized("confirmation token required")
+
+        intent = self._intent_registry.get(confirmation_token)
+        if intent is None:
+            raise NotAuthorized("invalid or unknown confirmation token")
+
+        if intent.purpose != "file_review":
+            raise NotAuthorized("token purpose mismatch")
+        if intent.web_session_id != ctx.web_session_id:
+            raise NotAuthorized("token belongs to another session")
+        if intent.principal != ctx.principal:
+            raise NotAuthorized("token belongs to another principal")
+
+        fp = fingerprint(req)
+        if (
+            intent.project_id != req.project_id
+            or intent.target_id != req.occurrence_id
+            or intent.candidate_id != req.work_file_id
+            or intent.action != req.action
+            or intent.expected_revision != req.expected_revision
+            or intent.idempotency_key != req.idempotency_key
+            or intent.fingerprint != fp
+        ):
+            raise NotAuthorized("request does not match confirmed intent")
+
+        if intent.status == "pending" and self.clock() > intent.expires_at:
+            raise NotAuthorized("confirmation token expired")
+
+        def fn(tx: Tx, _: Any) -> api.ReviewFileDecisionOut:
+            occ = self.store.occurrences.get(req.project_id, req.occurrence_id)
+            if occ.revision != req.expected_revision:
+                raise RevisionConflict(
+                    "occurrence revision has changed",
+                    details={"current_revisions": {req.occurrence_id: occ.revision}},
+                )
+            wf = self._file_review_target(occ, req)
+            if req.file_kind == "citation_file":
+                state = RetrievalState.VERIFIED if req.action == "approve" else RetrievalState.FAILED
+                reasons = list(wf.reasons)
+                if req.action == "reject" and ReasonCode.FILE_REJECTED_BY_USER not in reasons:
+                    reasons.append(ReasonCode.FILE_REJECTED_BY_USER.value)
+                self.store.citation_files.update(wf.model_copy(update={"state": state, "reasons": reasons}))
+                if occ.approval:
+                    occ.approval.occurrence_revision = occ.revision + 1
+                new_occ = self.store.occurrences.update(occ, expected_revision=req.expected_revision)
+                tx.audit(
+                    AuditEventType.FILE_APPROVED if req.action == "approve" else AuditEventType.FILE_REJECTED,
+                    occ.occurrence_id,
+                    surface=ApprovalSurface.WEB_UI,
+                    principal=ctx.principal,
+                    sha256=wf.sha256,
+                    work_file_id=wf.citation_file_id,
+                    file_kind="citation_file",
+                    target_doi=wf.target_doi,
+                    overridden_reasons=list(wf.reasons),
+                    note=req.note,
+                )
+                return api.ReviewFileDecisionOut(
+                    occurrence_id=occ.occurrence_id,
+                    work_file_id=wf.citation_file_id,
+                    retrieval=state,
+                    revision=new_occ.revision,
+                )
+
+            if req.action == "approve":
+                updated_wf = wf.model_copy(update={"state": RetrievalState.VERIFIED})
+                if hasattr(self.store.work_files, "update"):
+                    self.store.work_files.update(updated_wf)
+                elif hasattr(self.store.work_files, "_write"):
+                    self.store.work_files._write(updated_wf)
+                else:
+                    self.store.work_files.add(updated_wf)
+
+                occ.retrieval = RetrievalState.VERIFIED
+                if occ.approval:
+                    occ.approval.occurrence_revision = occ.revision + 1
+                new_occ = self.store.occurrences.update(occ, expected_revision=req.expected_revision)
+
+                tx.audit(
+                    AuditEventType.FILE_APPROVED,
+                    occ.occurrence_id,
+                    surface=ApprovalSurface.WEB_UI,
+                    principal=ctx.principal,
+                    sha256=wf.sha256,
+                    work_file_id=wf.work_file_id,
+                    overridden_reasons=list(wf.reasons),
+                    reasons=list(wf.reasons),
+                )
+                return api.ReviewFileDecisionOut(
+                    occurrence_id=occ.occurrence_id,
+                    work_file_id=wf.work_file_id,
+                    retrieval=new_occ.retrieval,
+                    revision=new_occ.revision,
+                )
+            else:
+                occ.retrieval = RetrievalState.FAILED
+                if ReasonCode.FILE_REJECTED_BY_USER not in occ.identity_reasons:
+                    occ.identity_reasons.append(ReasonCode.FILE_REJECTED_BY_USER)
+                if occ.approval:
+                    occ.approval.occurrence_revision = occ.revision + 1
+                new_occ = self.store.occurrences.update(occ, expected_revision=req.expected_revision)
+
+                tx.audit(
+                    AuditEventType.FILE_REJECTED,
+                    occ.occurrence_id,
+                    surface=ApprovalSurface.WEB_UI,
+                    principal=ctx.principal,
+                    sha256=wf.sha256,
+                    work_file_id=wf.work_file_id,
+                    reason=ReasonCode.FILE_REJECTED_BY_USER,
+                )
+                return api.ReviewFileDecisionOut(
+                    occurrence_id=occ.occurrence_id,
+                    work_file_id=wf.work_file_id,
+                    retrieval=new_occ.retrieval,
+                    revision=new_occ.revision,
+                )
+
+        out = self._mutate(ctx, "confirm_web_file_review", req.project_id, req, api.ReviewFileDecisionOut, fn)
+        self._intent_registry.mark_completed(confirmation_token)
+        return out
+
+    def get_settings(self, ctx: CallContext, req: api.GetSettingsIn) -> api.GetSettingsOut:
+        if ctx.channel != Channel.WEB_UI or not ctx.web_session_id:
+            raise NotAuthorized("get_settings requires Channel.WEB_UI and an active web session")
+        self._need(ctx, Scope.PROJECTS_READ)
+
+        home = self.settings.rc_home.resolve()
+        with config_lock(home):
+            fresh_settings = load_settings(home)
+            try:
+                keys_presence = secrets_present()
+                keys_fp = keys_fingerprints(home)
+                warnings: list[str] = []
+            except Exception:
+                keys_presence = {name: False for name in ("openalex_key", "s2_key")}
+                keys_fp = {name: None for name in ("openalex_key", "s2_key")}
+                warnings = ["keyring unavailable"]
+
+            for folder in fresh_settings.allow_folders:
+                if not folder.is_dir():
+                    warnings.append(f"allowed folder does not exist: {folder}")
+
+            project = self.store.projects.get(req.project_id) if req.project_id else None
+            revision = compute_settings_revision(fresh_settings, keys_fp, project)
+            out = build_get_settings_out(
+                fresh_settings,
+                revision=revision,
+                keys_presence=keys_presence,
+                project=project,
+                warnings=warnings,
+            )
+            return self._meta(ctx, out, project.revision if project else None)
+
+    def prepare_web_settings(self, ctx: CallContext, req: api.UpdateWebSettingsIn) -> api.WebIntentOut:
+        if ctx.channel != Channel.WEB_UI or not ctx.web_session_id:
+            raise NotAuthorized("prepare_web_settings requires Channel.WEB_UI and an active web session")
+        self._need(ctx, Scope.PROJECTS_WRITE)
+
+        home = self.settings.rc_home.resolve()
+        with config_lock(home):
+            fresh = load_settings(home)
+            try:
+                keys_presence = secrets_present()
+                keys_fp = keys_fingerprints(home)
+            except Exception:
+                keys_presence = {name: False for name in ("openalex_key", "s2_key")}
+                keys_fp = {name: None for name in ("openalex_key", "s2_key")}
+
+            c = req.change
+            project = None
+            summary: dict[str, Any] = {}
+            target_id = None
+            if isinstance(c, api.SetProjectNetworkChange):
+                project = self.store.projects.get(c.project_id)
+                target_id = c.project_id
+                summary = {
+                    "change": "set_project_network",
+                    "project_id": c.project_id,
+                    "before": project.network_mode.value,
+                    "after": c.mode.value,
+                }
+            elif isinstance(c, api.SetProjectDownloadsChange):
+                project = self.store.projects.get(c.project_id)
+                target_id = c.project_id
+                summary = {
+                    "change": "set_project_downloads",
+                    "project_id": c.project_id,
+                    "before": project.download_enabled,
+                    "after": c.enabled,
+                }
+            elif isinstance(c, api.SetEmailChange):
+                if not c.value or not c.value.strip():
+                    raise InvalidInput("email cannot be empty")
+                summary = {
+                    "change": "set_email",
+                    "before": fresh.email,
+                    "after": c.value.strip(),
+                }
+            elif isinstance(c, api.AddAllowedFolderChange):
+                p = Path(c.path).expanduser().resolve()
+                summary = {
+                    "change": "add_allowed_folder",
+                    "folder": str(p),
+                }
+            elif isinstance(c, api.SetPdfFallbackChange):
+                normalized = normalize_pdf_fallback(c.value)
+                summary = {
+                    "change": "set_pdf_fallback",
+                    "before": fresh.pdf_fallback_url,
+                    "after": normalized,
+                }
+            elif isinstance(c, api.SetProviderKeyChange):
+                if c.provider not in ("openalex_key", "s2_key"):
+                    raise InvalidInput(f"unknown provider key {c.provider}")
+                try:
+                    get_secret(c.provider)
+                except Exception:
+                    raise IntegrationUnavailable("OS keyring is unavailable") from None
+                summary = {
+                    "change": "set_provider_key",
+                    "provider": c.provider,
+                    "before_configured": keys_presence.get(c.provider, False),
+                    "after_configured": True,
+                }
+            else:
+                raise InvalidInput(f"unsupported change type: {getattr(c, 'type', None)}")
+
+            curr_rev = compute_settings_revision(fresh, keys_fp, project)
+            if curr_rev != req.expected_settings_revision:
+                raise RevisionConflict(
+                    "settings revision conflict: settings have changed",
+                    details={"expected": req.expected_settings_revision, "current": curr_rev},
+                )
+
+            fp = self._fingerprint_web_settings(home, req)
+            now = self.clock()
+            record = self._intent_registry.register(
+                purpose="settings",
+                principal=ctx.principal,
+                web_session_id=ctx.web_session_id,
+                project_id=project.project_id if project else None,
+                target_id=target_id,
+                candidate_id=None,
+                action=c.type,
+                expected_revision=req.expected_settings_revision,
+                idempotency_key=req.idempotency_key,
+                fingerprint=fp,
+                summary=summary,
+                now=now,
+            )
+            out = api.WebIntentOut(
+                confirmation_token=record.token,
+                expires_at=record.expires_at,
+                purpose="settings",
+                summary=summary,
+            )
+            return self._meta(ctx, out, project.revision if project else None)
+
+    def confirm_web_settings(
+        self, ctx: CallContext, req: api.UpdateWebSettingsIn, confirmation_token: str
+    ) -> api.GetSettingsOut:
+        if ctx.channel != Channel.WEB_UI or not ctx.web_session_id:
+            raise NotAuthorized("confirm_web_settings requires Channel.WEB_UI and an active web session")
+        self._need(ctx, Scope.PROJECTS_WRITE)
+
+        if not confirmation_token or not confirmation_token.strip():
+            raise NotAuthorized("confirmation token required")
+
+        intent = self._intent_registry.get(confirmation_token)
+        if intent is None:
+            raise NotAuthorized("invalid or unknown confirmation token")
+
+        if intent.purpose != "settings":
+            raise NotAuthorized("token purpose mismatch")
+        if intent.web_session_id != ctx.web_session_id:
+            raise NotAuthorized("token belongs to another session")
+        if intent.principal != ctx.principal:
+            raise NotAuthorized("token belongs to another principal")
+
+        home = self.settings.rc_home.resolve()
+        fp = self._fingerprint_web_settings(home, req)
+        if (
+            intent.action != req.change.type
+            or intent.expected_revision != req.expected_settings_revision
+            or intent.idempotency_key != req.idempotency_key
+            or intent.fingerprint != fp
+        ):
+            raise NotAuthorized("request does not match confirmed intent")
+
+        if intent.status == "pending" and self.clock() > intent.expires_at:
+            raise NotAuthorized("confirmation token expired")
+
+        grant = api.SettingsGrant(
+            token=confirmation_token,
+            web_session_id=ctx.web_session_id,
+            expected_settings_revision=req.expected_settings_revision,
+            expires_at=intent.expires_at,
+            fingerprint=fp,
+        )
+        authed_ctx = dataclasses.replace(ctx, settings_grant=grant)
+        out = self.update_web_settings(authed_ctx, req)
+        self._intent_registry.mark_completed(confirmation_token)
+        return out
+
+    def update_web_settings(self, ctx: CallContext, req: api.UpdateWebSettingsIn) -> api.GetSettingsOut:
+        if ctx.channel != Channel.WEB_UI or not ctx.web_session_id:
+            raise NotAuthorized("update_web_settings requires Channel.WEB_UI and an active web session")
+        if ctx.settings_grant is None:
+            raise NotAuthorized("settings write requires service-validated settings grant")
+        self._need(ctx, Scope.PROJECTS_WRITE)
+
+        home = self.settings.rc_home.resolve()
+        fp = self._fingerprint_web_settings(home, req)
+        grant = ctx.settings_grant
+        intent = self._intent_registry.get(grant.token)
+        if intent is None or intent.purpose != "settings":
+            raise NotAuthorized("invalid or forged settings grant")
+        if intent.status == "pending" and self.clock() > intent.expires_at:
+            raise NotAuthorized("settings grant expired")
+        if (
+            intent.web_session_id != grant.web_session_id
+            or intent.principal != ctx.principal
+            or grant.expected_settings_revision != req.expected_settings_revision
+            or grant.fingerprint != fp
+        ):
+            raise NotAuthorized("settings grant does not match request")
+
+        c = req.change
+        # Branch 1: Project-scoped settings
+        if isinstance(c, (api.SetProjectNetworkChange, api.SetProjectDownloadsChange)):
+            pid = c.project_id
+            with config_lock(home):
+                now = self.clock()
+                rec = self.store.idempotency.get(
+                    ctx.principal, pid, "update_web_settings", req.idempotency_key, now=now
+                )
+                if rec is not None:
+                    if rec.fingerprint != fp:
+                        raise IdempotencyConflict(
+                            f"key {req.idempotency_key} was used with a different request"
+                        )
+                    return api.GetSettingsOut.model_validate(rec.result)
+
+                with self.store.transaction(immediate=True):
+                    now = self.clock()
+                    rec = self.store.idempotency.get(
+                        ctx.principal, pid, "update_web_settings", req.idempotency_key, now=now
+                    )
+                    if rec is not None:
+                        if rec.fingerprint != fp:
+                            raise IdempotencyConflict(
+                                f"key {req.idempotency_key} was used with a different request"
+                            )
+                        return api.GetSettingsOut.model_validate(rec.result)
+
+                    fresh = load_settings(home)
+                    try:
+                        keys_presence = secrets_present()
+                        keys_fp = keys_fingerprints(home)
+                    except Exception:
+                        keys_presence = {name: False for name in ("openalex_key", "s2_key")}
+                        keys_fp = {name: None for name in ("openalex_key", "s2_key")}
+
+                    p = self.store.projects.get(pid)
+                    curr_rev = compute_settings_revision(fresh, keys_fp, p)
+                    if curr_rev != req.expected_settings_revision:
+                        raise RevisionConflict(
+                            "settings revision conflict",
+                            details={"expected": req.expected_settings_revision, "current": curr_rev},
+                        )
+
+                    diff: dict[str, Any] = {}
+                    if isinstance(c, api.SetProjectNetworkChange):
+                        if p.network_mode != c.mode:
+                            diff["network_mode"] = [p.network_mode.value, c.mode.value]
+                            p = self.store.projects.update(p.model_copy(update={"network_mode": c.mode}))
+                    elif isinstance(c, api.SetProjectDownloadsChange):
+                        if p.download_enabled != c.enabled:
+                            diff["download_enabled"] = [str(p.download_enabled), str(c.enabled)]
+                            p = self.store.projects.update(
+                                p.model_copy(update={"download_enabled": c.enabled})
+                            )
+
+                    if diff:
+                        new_proj_rev = self.store.projects.bump_revision(pid)
+                        p = self.store.projects.get(pid)
+                        now = self.clock()
+                        tx = Tx(self, ctx, p, new_proj_rev, now)
+                        tx.audit(AuditEventType.PROJECT_SETTINGS_CHANGED, p.project_id, changed=diff)
+
+                    new_settings_rev = compute_settings_revision(fresh, keys_fp, p)
+                    out = build_get_settings_out(
+                        fresh, revision=new_settings_rev, keys_presence=keys_presence, project=p
+                    )
+                    self._meta(ctx, out, p.revision)
+                    now = self.clock()
+                    self.store.idempotency.put(
+                        IdempotencyRecord(
+                            principal=ctx.principal,
+                            project_id=pid,
+                            tool="update_web_settings",
+                            key=req.idempotency_key,
+                            fingerprint=fp,
+                            result=out.model_dump(mode="json"),
+                            created_at=now,
+                            expires_at=expiry(now, self.settings.limits.idempotency_ttl_s),
+                        )
+                    )
+                    return out
+
+        # Branch 2: Global settings (cross-store recovery)
+        with config_lock(home):
+            now = self.clock()
+            rec = self.store.idempotency.get(
+                ctx.principal, "", "update_web_settings", req.idempotency_key, now=now
+            )
+            if rec is not None:
+                if rec.fingerprint != fp:
+                    raise IdempotencyConflict(f"key {req.idempotency_key} was used with a different request")
+                res = rec.result
+                if res.get("status") == "completed":
+                    return api.GetSettingsOut.model_validate(res["response"])
+
+            fresh = load_settings(home)
+            keyring_error = None
+            try:
+                keys_presence = secrets_present()
+                keys_fp = keys_fingerprints(home)
+            except Exception as exc:
+                keys_presence = {name: False for name in ("openalex_key", "s2_key")}
+                keys_fp = {name: None for name in ("openalex_key", "s2_key")}
+                keyring_error = exc
+
+            curr_rev = compute_settings_revision(fresh, keys_fp)
+
+            if rec is not None:
+                res = rec.result
+                if res.get("status") == "pending":
+                    if keyring_error is not None:
+                        raise IntegrationUnavailable("OS keyring is unavailable") from None
+                    if curr_rev == res["target_revision"]:
+                        now = self.clock()
+                        completed_payload = {**res, "status": "completed"}
+                        self.store.idempotency.put(
+                            IdempotencyRecord(
+                                principal=ctx.principal,
+                                project_id="",
+                                tool="update_web_settings",
+                                key=req.idempotency_key,
+                                fingerprint=fp,
+                                result=completed_payload,
+                                created_at=now,
+                                expires_at=expiry(now, self.settings.limits.idempotency_ttl_s),
+                            )
+                        )
+                        self.settings = fresh
+                        if self._config_path.exists():
+                            self._config_mtime_ns = self._config_path.stat().st_mtime_ns
+                        return api.GetSettingsOut.model_validate(res["response"])
+                    elif curr_rev == res["before_revision"]:
+                        pass
+                    else:
+                        raise RevisionConflict(
+                            "settings state changed during recovery",
+                            details={"current": curr_rev, "expected": res["before_revision"]},
+                        )
+
+            if curr_rev != req.expected_settings_revision:
+                raise RevisionConflict(
+                    "settings revision conflict",
+                    details={"expected": req.expected_settings_revision, "current": curr_rev},
+                )
+
+            target_settings = fresh.model_copy(deep=True)
+            target_keys_fp = dict(keys_fp)
+            target_keys_presence = dict(keys_presence)
+
+            if isinstance(c, api.SetEmailChange):
+                if not c.value or not c.value.strip():
+                    raise InvalidInput("email cannot be empty")
+                target_settings.email = c.value.strip()
+            elif isinstance(c, api.AddAllowedFolderChange):
+                folder = Path(c.path).expanduser().resolve()
+                if folder not in target_settings.allow_folders:
+                    target_settings.allow_folders.append(folder)
+            elif isinstance(c, api.SetPdfFallbackChange):
+                normalized = normalize_pdf_fallback(c.value)
+                target_settings.pdf_fallback_url = normalized
+            elif isinstance(c, api.SetProviderKeyChange):
+                try:
+                    target_keys_presence[c.provider] = True
+                    target_keys_fp[c.provider] = keyed_secret_digest(home, c.value.get_secret_value())
+                except Exception:
+                    raise IntegrationUnavailable("OS keyring is unavailable") from None
+
+            target_rev = compute_settings_revision(target_settings, target_keys_fp)
+            safe_out = build_get_settings_out(
+                target_settings, revision=target_rev, keys_presence=target_keys_presence
+            )
+            self._meta(ctx, safe_out)
+
+            now = self.clock()
+            pending_payload = {
+                "status": "pending",
+                "before_revision": curr_rev,
+                "target_revision": target_rev,
+                "response": safe_out.model_dump(mode="json"),
+            }
+            self.store.idempotency.put(
+                IdempotencyRecord(
+                    principal=ctx.principal,
+                    project_id="",
+                    tool="update_web_settings",
+                    key=req.idempotency_key,
+                    fingerprint=fp,
+                    result=pending_payload,
+                    created_at=now,
+                    expires_at=expiry(now, self.settings.limits.idempotency_ttl_s),
+                )
+            )
+
+            if isinstance(c, api.SetProviderKeyChange):
+                try:
+                    set_secret(c.provider, c.value.get_secret_value())
+                except Exception:
+                    raise IntegrationUnavailable("OS keyring is unavailable") from None
+            else:
+                save_settings(target_settings)
+
+            self.settings = load_settings(home)
+            if self._config_path.exists():
+                self._config_mtime_ns = self._config_path.stat().st_mtime_ns
+
+            completed_payload = {
+                "status": "completed",
+                "before_revision": curr_rev,
+                "target_revision": target_rev,
+                "response": safe_out.model_dump(mode="json"),
+            }
+            self.store.idempotency.put(
+                IdempotencyRecord(
+                    principal=ctx.principal,
+                    project_id="",
+                    tool="update_web_settings",
+                    key=req.idempotency_key,
+                    fingerprint=fp,
+                    result=completed_payload,
+                    created_at=now,
+                    expires_at=expiry(now, self.settings.limits.idempotency_ttl_s),
+                )
+            )
+
+            return safe_out

@@ -24,6 +24,7 @@ from refcollector.domain.models import (
     Artifact,
     AuditEvent,
     Candidate,
+    CitationFile,
     Decision,
     FileBlob,
     IdempotencyRecord,
@@ -102,6 +103,15 @@ class FakeProjectRepo:
         project.revision += 1
         project.updated_at = utcnow()
         return project.revision
+
+    def get_counts(self, project_id: str) -> tuple[int, int]:
+        self.get(project_id)
+        return 0, 0
+
+    def delete(self, project_id: str) -> None:
+        if project_id not in self.rows:
+            raise NotFound(f"{project_id} not found", details={"id": project_id})
+        del self.rows[project_id]
 
 
 class FakeSourceRepo(_Scoped):
@@ -392,6 +402,21 @@ class FakeFileStore:
         return count
 
 
+class FakeCitationFileRepo(_Scoped):
+    key = "citation_file_id"
+
+    def update(self, file: CitationFile) -> CitationFile:
+        self.get(file.project_id, file.citation_file_id)
+        return self.add(file)
+
+    def list_for_occurrence(self, project_id: str, occurrence_id: str) -> list[CitationFile]:
+        return [
+            _copy(file)
+            for file in self.rows.values()
+            if file.project_id == project_id and file.occurrence_id == occurrence_id
+        ]
+
+
 class FakeStore:
     """Implements contracts.ports.Store. `transaction()` is a no-op context manager."""
 
@@ -405,6 +430,7 @@ class FakeStore:
         self.access_checks = FakeAccessCheckRepo()
         self.local_copies = FakeLocalCopyRepo()
         self.work_files = FakeWorkFileRepo()
+        self.citation_files = FakeCitationFileRepo()
         self.artifacts = FakeArtifactRepo()
         self.audit = FakeAuditRepo()
         self.idempotency = FakeIdempotencyRepo()

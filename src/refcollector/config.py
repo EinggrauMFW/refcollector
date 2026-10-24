@@ -6,12 +6,19 @@ presence is reported (spec 13).
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
+import hmac
 import json
 import os
+import secrets
+import tempfile
+import threading
 from pathlib import Path
 
 import keyring
 import platformdirs
+import portalocker
 from pydantic import BaseModel, ConfigDict, Field
 
 from refcollector.domain.enums import Scope
@@ -101,6 +108,45 @@ def default_rc_home() -> Path:
     return Path(env) if env else Path(platformdirs.user_data_dir(APP_NAME, appauthor=False))
 
 
+_config_lock_state = threading.local()
+
+
+@contextlib.contextmanager
+def config_lock(rc_home: Path, timeout: float = 10.0):
+    """Sidecar file lock (config.lock) that survives config.json replacement.
+
+    Thread-local depth tracking by home path avoids nested reentrancy deadlocks
+    on the same home, while correctly locking across different homes.
+    """
+    home = rc_home.resolve()
+    home.mkdir(parents=True, exist_ok=True)
+    depths = getattr(_config_lock_state, "depths", None)
+    if depths is None:
+        depths = {}
+        _config_lock_state.depths = depths
+
+    current_depth = depths.get(home, 0)
+    if current_depth > 0:
+        depths[home] = current_depth + 1
+        try:
+            yield
+        finally:
+            depths[home] -= 1
+            if depths[home] <= 0:
+                depths.pop(home, None)
+        return
+
+    lock_path = home / "config.lock"
+    with portalocker.Lock(str(lock_path), timeout=timeout):
+        depths[home] = 1
+        try:
+            yield
+        finally:
+            depths[home] -= 1
+            if depths[home] <= 0:
+                depths.pop(home, None)
+
+
 def load_settings(rc_home: Path | None = None) -> Settings:
     home = (rc_home or default_rc_home()).resolve()
     path = home / "config.json"
@@ -110,9 +156,31 @@ def load_settings(rc_home: Path | None = None) -> Settings:
 
 
 def save_settings(settings: Settings) -> None:
-    settings.rc_home.mkdir(parents=True, exist_ok=True)
+    """Save settings atomically under the shared sidecar configuration lock.
+
+    Saves through a unique same-directory temporary file, flush/close, and os.replace.
+    """
+    home = settings.rc_home.resolve()
+    home.mkdir(parents=True, exist_ok=True)
     data = settings.model_dump(mode="json", exclude={"rc_home"})
-    settings.config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    content = json.dumps(data, indent=2).encode("utf-8")
+    with config_lock(home):
+        fd, tmp_path_str = tempfile.mkstemp(
+            dir=str(home),
+            prefix=".config.",
+            suffix=".tmp",
+        )
+        tmp_path = Path(tmp_path_str)
+        try:
+            with open(fd, "wb") as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, settings.config_path)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
 
 
 def get_secret(name: str) -> str | None:
@@ -126,3 +194,60 @@ def set_secret(name: str, value: str) -> None:
 def secrets_present() -> dict[str, bool]:
     """For get_capabilities: presence only, never values (spec 13)."""
     return {name: get_secret(name) is not None for name in SECRET_NAMES}
+
+
+def _get_or_create_hmac_key(rc_home: Path) -> bytes:
+    home = rc_home.resolve()
+    key_file = home / ".secret_hmac_key"
+    if key_file.exists():
+        return key_file.read_bytes()
+    key = secrets.token_bytes(32)
+    home.mkdir(parents=True, exist_ok=True)
+    with config_lock(home):
+        if key_file.exists():
+            return key_file.read_bytes()
+        fd, tmp_path_str = tempfile.mkstemp(dir=str(home), prefix=".hmac.", suffix=".tmp")
+        tmp_path = Path(tmp_path_str)
+        try:
+            with open(fd, "wb") as f:
+                f.write(key)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, key_file)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
+    return key
+
+
+def keyed_secret_digest(rc_home: Path, secret_value: str) -> str:
+    """HMAC-SHA256 of the secret value using a persistent service key. Never plain SHA."""
+    key = _get_or_create_hmac_key(rc_home)
+    return hmac.new(key, secret_value.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def get_key_fingerprint(rc_home: Path, name: str) -> str | None:
+    val = get_secret(name)
+    if val is None:
+        return None
+    return keyed_secret_digest(rc_home, val)
+
+
+def keys_fingerprints(rc_home: Path) -> dict[str, str | None]:
+    return {name: get_key_fingerprint(rc_home, name) for name in SECRET_NAMES}
+
+
+def normalize_pdf_fallback(value: str | None) -> str | None:
+    """Select box, su, st, ru, a custom HTTPS DOI template, off, or None."""
+    if value is None or value == "off":
+        return None
+    presets = {name: f"https://sci-hub.{name}/{{doi}}" for name in ("box", "su", "st", "ru")}
+    selected = presets.get(value, value)
+    for template in presets.values():
+        if selected.rstrip("/") == template.removesuffix("/{doi}"):
+            selected = template
+            break
+    from refcollector.files.pdf_fallback import validate_template
+
+    return validate_template(selected)

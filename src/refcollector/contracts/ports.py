@@ -20,6 +20,7 @@ from refcollector.domain.enums import (
     CopyVersion,
     ExtractionWarning,
     IdentityState,
+    JobState,
     NetworkMode,
     ReasonCode,
     RetrievalState,
@@ -33,6 +34,7 @@ from refcollector.domain.models import (
     Artifact,
     AuditEvent,
     Candidate,
+    CitationFile,
     ConfigSnapshot,
     Decision,
     FileBlob,
@@ -77,6 +79,9 @@ class ProjectRepo(Protocol):
         """+1 on every committed mutation in the project (11.3). Returns the new value."""
         ...
 
+    def get_counts(self, project_id: str) -> tuple[int, int]: ...
+    def delete(self, project_id: str) -> None: ...
+
 
 class SourceRepo(Protocol):
     def add(self, source: Source) -> Source: ...
@@ -99,6 +104,7 @@ class OccurrenceQuery:
     identity: str | None = None
     discovery: str | None = None
     classification: str | None = None
+    classification_is_null: bool | None = None
     local_copy: str | None = None
     retrieval: str | None = None
     reason: str | None = None  # ReasonCode or ExtractionWarning value
@@ -166,12 +172,21 @@ class AccessCheckRepo(Protocol):
 
 class LocalCopyRepo(Protocol):
     def add(self, copy: LocalCopy) -> LocalCopy: ...
+    def get(self, project_id: str, local_copy_id: str) -> LocalCopy: ...
     def list_for_work(self, project_id: str, work_id: str) -> list[LocalCopy]: ...
 
 
 class WorkFileRepo(Protocol):
     def add(self, wf: WorkFile) -> WorkFile: ...
+    def get(self, project_id: str, work_file_id: str) -> WorkFile: ...
     def list_for_work(self, project_id: str, work_id: str) -> list[WorkFile]: ...
+
+
+class CitationFileRepo(Protocol):
+    def add(self, file: CitationFile) -> CitationFile: ...
+    def update(self, file: CitationFile) -> CitationFile: ...
+    def get(self, project_id: str, citation_file_id: str) -> CitationFile: ...
+    def list_for_occurrence(self, project_id: str, occurrence_id: str) -> list[CitationFile]: ...
 
 
 class ArtifactRepo(Protocol):
@@ -179,6 +194,9 @@ class ArtifactRepo(Protocol):
     def get(self, project_id: str, artifact_id: str) -> Artifact: ...
     def list(
         self, project_id: str, *, kind: str | None = None, after: str | None = None, limit: int = 25
+    ) -> Page[Artifact]: ...
+    def list_global(
+        self, *, kind: str | None = None, after: str | None = None, limit: int = 25
     ) -> Page[Artifact]: ...
 
 
@@ -243,6 +261,7 @@ class Store(Protocol):
     access_checks: AccessCheckRepo
     local_copies: LocalCopyRepo
     work_files: WorkFileRepo
+    citation_files: CitationFileRepo
     artifacts: ArtifactRepo
     audit: AuditRepo
     idempotency: IdempotencyRepo
@@ -307,6 +326,14 @@ class JobQueue(Protocol):
 
     def get_job(self, project_id: str, job_id: str) -> Job: ...
     def list_jobs(self, project_id: str, *, limit: int = 10) -> list[Job]: ...
+    def list_all_jobs(
+        self,
+        *,
+        project_id: str | None = None,
+        states: Sequence[JobState] | None = None,
+        after: str | None = None,
+        limit: int = 25,
+    ) -> Page[Job]: ...
     def stage_counts(self, job_id: str) -> dict[StepType, dict[str, int]]:
         """Per stage: counts by StepState value (get_job.stages)."""
         ...
@@ -638,6 +665,20 @@ class RetrievalOutcome:
     work_file: WorkFile | None
     reasons: list[str]
     error: dict[str, Any] | None = None
+
+
+@dataclass
+class PdfRetrievalOutcome:
+    """Guarded PDF transfer result before work or citation ownership is assigned."""
+
+    state: RetrievalState
+    blob: FileBlob | None
+    reasons: list[str]
+    error: dict[str, Any] | None = None
+    source_url: str = ""
+    final_url: str = ""
+    location_id: str | None = None
+    verification_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 class Retriever(Protocol):

@@ -1,0 +1,35 @@
+[
+  {
+    "document_id": "pilot-005",
+    "sha256": "3e56f4e8aaaf5e31088e0c7c58a449867fd04a6b39dbf22209ed16f08c0885b8",
+    "pages": 73,
+    "split": "development",
+    "title_metadata_unverified": "Proceedings of",
+    "cohort": "single_column_sampled",
+    "annotation_status": "not_started",
+    "source_url": "",
+    "redistribution_permission": "not_verified",
+    "prior_use": "not_audited",
+    "reference_heading_pages_1based": [
+      69
+    ],
+    "cohort_status": "provisional_sampled_pages_only",
+    "chapter_bibliographies": "not_confirmed",
+    "provenance_status": "local_pdf_evidence_only",
+    "source_url_candidates": [],
+    "first_page_doi_candidates": [],
+    "title_from_pdf": "Implementation of hydrodynamic forces into the Moving Frame Method for analysis of multi-body wave energy converters",
+    "title_evidence_page_1based": 1,
+    "identity_status": "local_pdf_title_recorded",
+    "doi_from_pdf": "",
+    "source_verification_status": "not_found",
+    "provenance_checked_date": "2026-10-22",
+    "provenance_notes": [],
+    "cohort_tags": [
+      "single_column"
+    ],
+    "benchmark_tier": "P0_candidate",
+    "disposition": "quarantined_source_not_verified",
+    "exclusion_reason": "No canonical source found in the bounded source review. Retain original PDF locally; exclude from active candidate packet."
+  }
+]

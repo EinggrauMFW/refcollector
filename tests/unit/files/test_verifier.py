@@ -217,3 +217,128 @@ def test_native_parse_failure_on_later_page_is_typed_and_closes_handle(tmp_path,
     monkeypatch.setattr(pymupdf.Page, "get_text", damaged)
     result = verify(tmp_path, paper_pdf(TITLE, [], DOI))
     assert result.state == RetrievalState.FAILED and "FILE_VALIDATION_FAILED" in result.reasons
+
+
+def test_incidental_second_page_doi_does_not_auto_verify_without_title(tmp_path):
+    with pymupdf.open() as doc:
+        p1 = doc.new_page()
+        p1.insert_text((72, 72), "Unrelated Paper Title\nAuthors: Alice and Bob\nJournal of Examples")
+        p2 = doc.new_page()
+        p2.insert_text(
+            (72, 72),
+            "1. Introduction\nThis article builds on prior method 10.1234/target.\nAbstract is below.",
+        )
+        data = doc.tobytes()
+    result = verify(tmp_path, data, WorkMetadata(doi="10.1234/target"))
+    assert result.state == RetrievalState.NEEDS_REVIEW
+    assert "DOI_EVIDENCE_MISSING" in result.reasons
+    assert result.evidence.get("primary_dois") == []
+
+
+def test_first_page_incidental_prose_doi_does_not_auto_verify_without_title(tmp_path):
+    # Offline probe: another paper whose first-page prose mentions target DOI before abstract
+    with pymupdf.open() as doc:
+        p1 = doc.new_page()
+        p1.insert_text(
+            (72, 72),
+            "Unrelated Paper Title\nAuthors: Alice and Bob\n1. Introduction\n"
+            "This article builds on prior method 10.1234/target.\n"
+            "Abstract\nThis paper discusses something else.",
+        )
+        data = doc.tobytes()
+    result = verify(tmp_path, data, WorkMetadata(doi="10.1234/target"))
+    assert result.state == RetrievalState.NEEDS_REVIEW
+    assert "DOI_EVIDENCE_MISSING" in result.reasons
+    assert result.evidence.get("primary_dois") == []
+    assert "10.1234/target" in result.evidence.get("dois", [])
+
+
+def test_first_page_ref_only_doi_does_not_auto_verify_without_title(tmp_path):
+    with pymupdf.open() as doc:
+        p1 = doc.new_page()
+        p1.insert_text(
+            (72, 72),
+            "Unrelated Paper Title\nAuthors: Alice and Bob\n"
+            "[1] Smith et al., 10.1234/target\nAbstract\nThis paper discusses something else.",
+        )
+        data = doc.tobytes()
+    result = verify(tmp_path, data, WorkMetadata(doi="10.1234/target"))
+    assert result.state == RetrievalState.NEEDS_REVIEW
+    assert "DOI_EVIDENCE_MISSING" in result.reasons
+    assert result.evidence.get("primary_dois") == []
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        "https://doi.org/10.1234/target",
+        "doi: 10.1234/target",
+        "10.1234/target",
+    ],
+)
+def test_first_page_real_declaration_verifies_without_title(tmp_path, declaration):
+    with pymupdf.open() as doc:
+        p1 = doc.new_page()
+        p1.insert_text(
+            (72, 72),
+            f"Matching Paper Title\nAuthors: Alice and Bob\n{declaration}\nAbstract\nText of the paper.",
+        )
+        data = doc.tobytes()
+    result = verify(tmp_path, data, WorkMetadata(doi="10.1234/target"))
+    assert result.state == RetrievalState.VERIFIED
+    assert result.evidence.get("primary_dois") == ["10.1234/target"]
+
+
+@pytest.mark.parametrize(
+    "declaration,expected",
+    [
+        ("https://doi.org/10.1234/target.", "10.1234/target"),
+        ("doi: 10.1234/target;", "10.1234/target"),
+        ("(https://doi.org/10.1234/target)", "10.1234/target"),
+        ("<https://doi.org/10.1234/target>", "10.1234/target"),
+        ("[https://doi.org/10.1234/target]", "10.1234/target"),
+        ("https://doi.org/10.1234/a(b).", "10.1234/a(b)"),
+        ("doi: 10.1234/a(b);", "10.1234/a(b)"),
+        ("(https://doi.org/10.1234/a(b))", "10.1234/a(b)"),
+    ],
+)
+def test_first_page_punctuation_and_balanced_doi_verifies(tmp_path, declaration, expected):
+    with pymupdf.open() as doc:
+        p1 = doc.new_page()
+        p1.insert_text(
+            (72, 72),
+            f"Matching Paper Title\nAuthors: Alice and Bob\n{declaration}\nAbstract\nText of the paper.",
+        )
+        data = doc.tobytes()
+    result = verify(tmp_path, data, WorkMetadata(doi=expected))
+    assert result.state == RetrievalState.VERIFIED
+    assert result.evidence.get("primary_dois") == [expected]
+
+
+@pytest.mark.parametrize(
+    "prose_line",
+    [
+        "Results extend https://doi.org/10.1234/target findings.",
+        "Smith et al. https://doi.org/10.1234/target",
+    ],
+)
+def test_first_page_prose_with_marked_doi_does_not_declare_primary(tmp_path, prose_line):
+    with pymupdf.open() as doc:
+        p1 = doc.new_page()
+        p1.insert_text(
+            (72, 72),
+            f"Matching Paper Title\nAuthors: Alice and Bob\n{prose_line}\nAbstract\nText of the paper.",
+        )
+        data = doc.tobytes()
+    result = verify(tmp_path, data, WorkMetadata(doi="10.1234/target"))
+    assert result.state == RetrievalState.NEEDS_REVIEW
+    assert "DOI_EVIDENCE_MISSING" in result.reasons
+    assert result.evidence.get("primary_dois") == []
+    assert "10.1234/target" in result.evidence.get("dois", [])
+
+    result_with_title = verify(
+        tmp_path, data, WorkMetadata(title="Matching Paper Title", doi="10.1234/target")
+    )
+    assert result_with_title.state == RetrievalState.NEEDS_REVIEW
+    assert "DOI_EVIDENCE_MISSING" in result_with_title.reasons
+    assert result_with_title.evidence.get("primary_dois") == []

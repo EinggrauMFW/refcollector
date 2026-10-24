@@ -466,10 +466,39 @@ def test_help_and_no_args(cli: Cli) -> None:
 # ---------- serve ----------
 
 
-def test_serve_web_not_available(cli: Cli) -> None:
+def test_serve_web_delegation(cli: Cli, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, str, int]] = []
+    fake_server = types.ModuleType("refcollector.web.server")
+    fake_server.run_web = lambda settings, host, port: calls.append((settings, host, port))  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "refcollector.web.server", fake_server)
+    r = cli.run("serve", "web", "--port", "8080")
+    assert r.exit_code == 0
+    assert len(calls) == 1
+    assert calls[0][1] == "127.0.0.1"
+    assert calls[0][2] == 8080
+    assert cli.app.started == 0
+
+
+def test_serve_web_missing_extra(cli: Cli, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "refcollector.web.server", None)
     r = cli.run("serve", "web")
     assert r.exit_code == 1
-    assert r.stderr.startswith("FEATURE_NOT_AVAILABLE:")
+    assert "FEATURE_NOT_AVAILABLE:" in r.stderr
+    assert "web extra is not installed" in r.stderr
+    assert cli.app.started == 0
+
+
+def test_serve_web_invalid_host(cli: Cli) -> None:
+    r = cli.run("serve", "web", "--host", "0.0.0.0")
+    assert r.exit_code == 1
+    assert "INVALID_INPUT:" in r.stderr
+    assert cli.app.started == 0
+
+
+def test_serve_web_invalid_port(cli: Cli) -> None:
+    r = cli.run("serve", "web", "--port", "70000")
+    assert r.exit_code == 1
+    assert "INVALID_INPUT:" in r.stderr
     assert cli.app.started == 0
 
 

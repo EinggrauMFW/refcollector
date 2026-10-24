@@ -36,6 +36,7 @@ class LayoutLine:
 class LayoutPage:
     index: int
     lines: list[LayoutLine]
+    is_blank: bool = False
 
     @property
     def text(self) -> str:
@@ -147,6 +148,12 @@ def pages_from_pdf(doc: pymupdf.Document) -> list[LayoutPage]:
                     )
                 )
                 offset += len(text) + 1
-        pages.append(LayoutPage(index, lines))
+        pages.append(
+            LayoutPage(
+                index,
+                lines,
+                is_blank=not lines and not page.get_bboxlog() and not page.annot_xrefs(),
+            )
+        )
     _ignore_headers(pages)
     return pages

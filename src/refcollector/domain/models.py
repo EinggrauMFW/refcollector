@@ -7,7 +7,7 @@ storage/migrations/0001_init.sql). Unknown fields are rejected everywhere.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -332,6 +332,42 @@ class WorkFile(Model):
     reasons: list[str] = Field(default_factory=list)
     export_name: str  # {year}_{first_author}_{short_title}.pdf
     retrieved_at: datetime = Field(default_factory=utcnow)
+
+
+class CitationFile(Model):
+    """A DOI-targeted PDF owned by a citation, independently of accepted metadata."""
+
+    citation_file_id: str
+    project_id: str
+    occurrence_id: str
+    target_doi: str
+    citation_revision: int
+    citation_text_sha256: str
+    verification_basis: Literal["citation_doi"] = "citation_doi"
+    job_id: str
+    sha256: str
+    bytes: int
+    source_url: str
+    final_url: str
+    state: RetrievalState
+    reasons: list[str] = Field(default_factory=list)
+    export_name: str
+    retrieved_at: datetime = Field(default_factory=utcnow)
+    verification_evidence: dict[str, Any] = Field(default_factory=dict)
+
+    def is_current(self, occurrence: Occurrence) -> bool:
+        """Metadata-only revisions do not invalidate an unchanged citation DOI."""
+        import hashlib
+
+        from refcollector.identity.identifiers import unique_doi
+
+        return (
+            occurrence.project_id == self.project_id
+            and occurrence.occurrence_id == self.occurrence_id
+            and occurrence.extraction != ExtractionState.EXCLUDED
+            and unique_doi(occurrence.text) == self.target_doi
+            and hashlib.sha256(occurrence.text.encode("utf-8")).hexdigest() == self.citation_text_sha256
+        )
 
 
 class Artifact(Model):

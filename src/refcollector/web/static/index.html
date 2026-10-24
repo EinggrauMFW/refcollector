@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RefCollector</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div id="aria-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="aria-alerts" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+  <header class="app-header">
+    <div class="header-brand">
+      <a class="brand-link" href="/advanced" aria-label="RefCollector advanced dashboard">
+        <svg class="mark" width="28" height="28" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+          <rect width="32" height="32" rx="7" class="mark-bg"></rect>
+          <path d="M12 8H9v16h3M20 8h3v16h-3" fill="none" class="mark-fg" stroke-width="2.4" stroke-linecap="square"></path>
+          <path d="M13.5 12.5h5M13.5 16h5M13.5 19.5h3" class="mark-fg" stroke-width="1.8" fill="none"></path>
+        </svg>
+        <span class="brand-title">RefCollector</span>
+      </a>
+      <nav class="mode-switch" aria-label="Mode">
+        <a id="mode-link-library" href="/">Library</a>
+        <a id="mode-link-advanced" href="/advanced" aria-current="page">Advanced</a>
+      </nav>
+    </div>
+    <div class="header-status">
+      <span id="user-principal-badge" class="badge">User: -</span>
+      <span id="server-version-badge" class="badge">Checking...</span>
+      <span id="executor-status-badge" class="badge">Executor: Unknown</span>
+    </div>
+    <div class="header-actions">
+      <div id="theme-control" class="seg-control" role="radiogroup" aria-label="Theme">
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-theme-choice="light">Light</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="false" data-theme-choice="dark">Dark</button>
+        <button type="button" class="seg-btn" role="radio" aria-checked="true" data-theme-choice="system">System</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-shell">
+  <aside class="sidebar" aria-label="Project and views">
+    <label class="project-selector-label" for="global-project-select">Project
+      <select id="global-project-select" aria-label="Active Project">
+        <option value="">No Project Selected</option>
+      </select>
+    </label>
+    <p class="nav-label">Views</p>
+    <nav class="app-nav" aria-label="Main Navigation">
+      <button type="button" class="nav-tab active" data-view="dashboard">Dashboard</button>
+      <button type="button" class="nav-tab" data-view="projects">Projects</button>
+      <button type="button" class="nav-tab" data-view="sources">Sources</button>
+      <button type="button" class="nav-tab" data-view="jobs">Jobs</button>
+      <button type="button" class="nav-tab" data-view="references">References</button>
+      <button type="button" class="nav-tab" data-view="artifacts">Artifacts</button>
+      <button type="button" class="nav-tab" data-view="settings">Settings</button>
+    </nav>
+  </aside>
+  <main id="main-content" class="app-main">
+    <!-- VIEW: DASHBOARD -->
+    <section id="view-dashboard" class="view-panel active">
+      <div class="panel-header">
+        <h1>System Dashboard</h1>
+        <button type="button" class="btn btn-sm" id="btn-refresh-dashboard">Refresh</button>
+      </div>
+
+      <div class="card grid-2">
+        <div>
+          <h3>System Capabilities</h3>
+          <dl class="meta-list" id="capabilities-meta-list">
+            <dt>Release</dt><dd id="cap-release">-</dd>
+            <dt>Stages</dt><dd id="cap-stages">-</dd>
+            <dt>Source Types</dt><dd id="cap-source-types">-</dd>
+            <dt>Export Formats</dt><dd id="cap-export-formats">-</dd>
+            <dt>Granted Scopes</dt><dd id="cap-scopes">-</dd>
+          </dl>
+        </div>
+        <div>
+          <h3>Provider Status</h3>
+          <div id="capabilities-providers" class="tag-list">Loading providers...</div>
+          <h3 class="mt-4">Executor Ownership</h3>
+          <div id="executor-details" class="meta-box">Loading executor status...</div>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-header">
+          <h3>Global Active Jobs</h3>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="table-global-jobs">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Project</th>
+                <th>State</th>
+                <th>Stages</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-global-jobs">
+              <tr><td colspan="6" class="text-muted">Loading active jobs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-header">
+          <h3>Global Artifacts</h3>
+        </div>
+        <div class="table-container">
+          <table class="data-table" id="table-global-artifacts">
+            <thead>
+              <tr>
+                <th>Artifact ID</th>
+                <th>Project</th>
+                <th>Kind</th>
+                <th>Media Type</th>
+                <th>Size</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-global-artifacts">
+              <tr><td colspan="6" class="text-muted">Loading global artifacts...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: PROJECTS -->
+    <section id="view-projects" class="view-panel">
+      <div class="panel-header">
+        <h1>Projects</h1>
+        <button type="button" class="btn btn-primary" id="btn-open-create-project">Create Project</button>
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table class="data-table" id="table-projects">
+            <thead>
+              <tr>
+                <th>Project Name</th>
+                <th>Project ID</th>
+                <th>Revision</th>
+                <th>Occurrences</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-projects">
+              <tr><td colspan="6" class="text-muted">Loading projects...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination-bar" id="projects-pagination">
+          <button type="button" class="btn btn-sm" id="btn-projects-prev" disabled>Previous</button>
+          <span id="projects-page-info" class="text-muted">Page 1</span>
+          <button type="button" class="btn btn-sm" id="btn-projects-next" disabled>Next</button>
+        </div>
+      </div>
+
+      <div class="card mt-4 hidden" id="project-detail-card">
+        <div class="card-header">
+          <h3 id="project-detail-title">Project Detail</h3>
+          <span id="project-detail-revision" class="badge">Rev -</span>
+        </div>
+        <div class="grid-2">
+          <div>
+            <h4>Configuration</h4>
+            <dl class="meta-list">
+              <dt>Network Mode</dt><dd id="proj-network-mode">-</dd>
+              <dt>Download Enabled</dt><dd id="proj-downloads-enabled">-</dd>
+              <dt>Policy Profile</dt><dd id="proj-policy-profile">-</dd>
+              <dt>Version Policy</dt><dd id="proj-version-policy">-</dd>
+            </dl>
+          </div>
+          <div>
+            <h4>Occurrence Status Denominator</h4>
+            <div id="project-counts-summary" class="counts-grid">Loading counts...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: SOURCES -->
+    <section id="view-sources" class="view-panel">
+      <div class="panel-header">
+        <h1>Project Sources</h1>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btn-open-import-source">Import Source</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table class="data-table" id="table-sources">
+            <thead>
+              <tr>
+                <th>Source ID</th>
+                <th>Label</th>
+                <th>Type</th>
+                <th>Pages</th>
+                <th>Sections</th>
+                <th>Extraction State</th>
+                <th>Occurrences</th>
+                <th>Imported</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-sources">
+              <tr><td colspan="9" class="text-muted">Select a project to view sources.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination-bar" id="sources-pagination">
+          <button type="button" class="btn btn-sm" id="btn-sources-prev" disabled>Previous</button>
+          <span id="sources-page-info" class="text-muted">Page 1</span>
+          <button type="button" class="btn btn-sm" id="btn-sources-next" disabled>Next</button>
+        </div>
+      </div>
+
+      <div class="card mt-4 hidden" id="source-detail-card">
+        <div class="card-header">
+          <h3 id="source-detail-title">Source Detail</h3>
+          <button type="button" class="btn btn-sm" id="btn-edit-sections">Edit Sections</button>
+        </div>
+        <div id="source-preflight-warnings" class="notice-box notice-warning hidden"></div>
+        <div class="grid-2 mt-2">
+          <div>
+            <h4>Sections</h4>
+            <ul id="source-sections-list" class="simple-list"></ul>
+          </div>
+          <div>
+            <h4>Extraction Information</h4>
+            <div id="source-extraction-info" class="meta-box"></div>
+          </div>
+        </div>
+        <div class="mt-4" id="source-preview-section">
+          <div class="card-header">
+            <h4>Safe Source Page Preview</h4>
+            <div class="actions" id="source-preview-controls">
+              <button type="button" class="btn btn-sm" id="btn-preview-prev-page" disabled>Previous Page</button>
+              <span id="source-preview-page-indicator" class="text-muted">Page 0</span>
+              <button type="button" class="btn btn-sm" id="btn-preview-next-page" disabled>Next Page</button>
+              <label class="project-selector-label" for="source-preview-scale-select">Scale:
+                <select id="source-preview-scale-select" aria-label="Preview Scale">
+                  <option value="1">100%</option>
+                  <option value="0.75">75%</option>
+                  <option value="1.25">125%</option>
+                  <option value="1.5">150%</option>
+                  <option value="2">200%</option>
+                  <option value="0.5">50%</option>
+                </select>
+              </label>
+              <button type="button" class="btn btn-sm btn-primary" id="btn-preview-load">Load Page</button>
+            </div>
+          </div>
+          <div id="source-preview-status" class="notice-box text-muted">
+            Select a page and click Load Page to preview server-rendered raster.
+          </div>
+          <div id="source-preview-stage" class="raster-stage-container hidden">
+            <div class="raster-viewport" id="source-preview-viewport">
+              <img id="source-preview-img" alt="Safe source page raster" class="raster-img">
+              <div id="source-preview-overlays" class="raster-overlays"></div>
+            </div>
+            <div id="source-preview-citation-caption" class="raster-citation-caption" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: JOBS -->
+    <section id="view-jobs" class="view-panel">
+      <div class="panel-header">
+        <h1>Project Jobs</h1>
+        <button type="button" class="btn btn-primary" id="btn-open-start-job">Start Job</button>
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table class="data-table" id="table-jobs">
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>State</th>
+                <th>Stages</th>
+                <th>Steps</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-jobs">
+              <tr><td colspan="5" class="text-muted">Select a project to view jobs.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card mt-4 hidden" id="job-detail-card">
+        <div class="card-header">
+          <h3 id="job-detail-title">Job Inspection</h3>
+          <div class="actions" id="job-control-actions">
+            <button type="button" class="btn btn-sm" id="btn-job-pause">Pause</button>
+            <button type="button" class="btn btn-sm" id="btn-job-resume">Resume</button>
+            <button type="button" class="btn btn-sm btn-danger" id="btn-job-cancel">Cancel</button>
+            <button type="button" class="btn btn-sm" id="btn-job-retry">Retry Failed</button>
+          </div>
+        </div>
+        <div id="job-progress-container" class="mt-2">
+          <h4>Stage Progress Breakdown</h4>
+          <div id="job-stages-breakdown" class="stage-breakdown-grid"></div>
+        </div>
+        <div id="job-warnings-box" class="notice-box notice-warning mt-2 hidden"></div>
+        <div id="job-results-box" class="meta-box mt-2 hidden"></div>
+      </div>
+    </section>
+
+    <!-- VIEW: REFERENCES -->
+    <section id="view-references" class="view-panel">
+      <div class="panel-header">
+        <h1>Reference Occurrences</h1>
+        <div class="actions">
+          <button type="button" class="btn btn-sm" id="btn-open-scratch-resolve">Scratch Lookup</button>
+          <button type="button" class="btn btn-primary" id="btn-open-add-reference">Add Reference</button>
+        </div>
+      </div>
+
+      <!-- SIX-DIMENSION FILTER BAR -->
+      <div class="card filter-card">
+        <div class="filter-row">
+          <label class="filter-label">Search Query
+            <input type="text" id="filter-query" placeholder="Search citation text (max 500 chars)..." maxlength="500">
+          </label>
+          <label class="filter-label">Sort
+            <select id="filter-sort">
+              <option value="order">Source Order</option>
+              <option value="year">Publication Year</option>
+              <option value="updated">Updated Time</option>
+            </select>
+          </label>
+          <label class="filter-label">Reason
+            <input type="text" id="filter-reason" placeholder="Filter by reason...">
+          </label>
+          <button type="button" class="btn btn-sm" id="btn-reset-filters">Reset Filters</button>
+        </div>
+
+        <div class="filter-dimensions-grid mt-2">
+          <!-- Dimension 1: Extraction -->
+          <div class="dimension-group">
+            <span class="dimension-title">1. Extraction</span>
+            <select id="filter-extraction" class="dimension-select">
+              <option value="">(All)</option>
+              <option value="pending">pending</option>
+              <option value="extracted">extracted</option>
+              <option value="needs_review">needs_review</option>
+              <option value="corrected">corrected</option>
+              <option value="excluded">excluded</option>
+              <option value="failed">failed</option>
+            </select>
+          </div>
+
+          <!-- Dimension 2: Identity -->
+          <div class="dimension-group">
+            <span class="dimension-title">2. Identity</span>
+            <select id="filter-identity" class="dimension-select">
+              <option value="">(All)</option>
+              <option value="unprocessed">unprocessed</option>
+              <option value="accepted_auto">accepted_auto</option>
+              <option value="accepted_agent">accepted_agent</option>
+              <option value="accepted_user">accepted_user</option>
+              <option value="needs_review">needs_review</option>
+              <option value="unresolved">unresolved</option>
+              <option value="rejected">rejected</option>
+            </select>
+          </div>
+
+          <!-- Dimension 3: Discovery -->
+          <div class="dimension-group">
+            <span class="dimension-title">3. Discovery</span>
+            <select id="filter-discovery" class="dimension-select">
+              <option value="">(All)</option>
+              <option value="not_checked">not_checked</option>
+              <option value="complete">complete</option>
+              <option value="partial">partial</option>
+              <option value="failed">failed</option>
+            </select>
+          </div>
+
+          <!-- Dimension 4: Classification -->
+          <div class="dimension-group">
+            <span class="dimension-title">4. Classification</span>
+            <select id="filter-classification" class="dimension-select">
+              <option value="">(All)</option>
+              <option value="eligible_found">eligible_found</option>
+              <option value="none_found">none_found</option>
+              <option value="restricted">restricted</option>
+              <option value="unknown">unknown</option>
+              <option value="__null__">unclassified (null)</option>
+            </select>
+          </div>
+
+          <!-- Dimension 5: Local Copy -->
+          <div class="dimension-group">
+            <span class="dimension-title">5. Local Copy</span>
+            <select id="filter-local-copy" class="dimension-select">
+              <option value="">(All)</option>
+              <option value="none">none</option>
+              <option value="candidate">candidate</option>
+              <option value="usable">usable</option>
+              <option value="unusable">unusable</option>
+            </select>
+          </div>
+
+          <!-- Dimension 6: Retrieval -->
+          <div class="dimension-group">
+            <span class="dimension-title">6. Retrieval</span>
+            <select id="filter-retrieval" class="dimension-select">
+              <option value="">(All)</option>
+              <option value="not_requested">not_requested</option>
+              <option value="queued">queued</option>
+              <option value="verified">verified</option>
+              <option value="needs_review">needs_review</option>
+              <option value="failed">failed</option>
+              <option value="satisfied_by_local_copy">satisfied_by_local_copy</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filter-scope-status mt-2">
+          <span id="filter-summary-text" class="text-muted">Total matches: 0</span>
+          <button type="button" class="btn btn-sm btn-primary" id="btn-download-all-filter">Retrieve All Filtered</button>
+          <span id="query-filter-warning" class="text-muted hidden text-xs">(All-filter disabled during text search)</span>
+          <span id="selection-scope-text" class="text-muted">Selected on page: 0</span>
+          <button type="button" class="btn btn-sm" id="btn-download-selected" disabled>Retrieve Selected</button>
+          <button type="button" class="btn btn-sm" id="btn-draft-selected" disabled>Draft Selected</button>
+        </div>
+      </div>
+
+      <!-- MASTER-DETAIL CONTAINER -->
+      <div class="master-detail-container mt-4">
+        <!-- Master Table -->
+        <div class="master-pane">
+          <div class="table-container">
+            <table class="data-table" id="table-references">
+              <thead>
+                <tr>
+                  <th class="col-checkbox"><input type="checkbox" id="chk-select-all-page" title="Select all on page"></th>
+                  <th>#</th>
+                  <th>Citation Text</th>
+                  <th>Extraction</th>
+                  <th>Identity</th>
+                  <th>Access</th>
+                  <th>Local Copy</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-references">
+                <tr><td colspan="7" class="text-muted">Select a project to list references.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination-bar" id="references-pagination">
+            <button type="button" class="btn btn-sm" id="btn-refs-prev" disabled>Previous</button>
+            <span id="refs-page-info" class="text-muted">Page 1</span>
+            <button type="button" class="btn btn-sm" id="btn-refs-next" disabled>Next</button>
+          </div>
+        </div>
+
+        <!-- Detail Inspection Pane -->
+        <aside class="detail-pane" id="reference-detail-pane">
+          <div class="detail-placeholder" id="reference-detail-empty">
+            Select a reference occurrence to inspect details and perform repairs.
+          </div>
+          <div id="reference-detail-content" class="hidden">
+            <div class="detail-header">
+              <h3 id="ref-detail-title">Occurrence Details</h3>
+              <span id="ref-detail-rev-badge" class="badge">Rev 0</span>
+            </div>
+
+            <!-- Citation & Spans -->
+            <div class="detail-section">
+              <h4>Citation Text</h4>
+              <p id="ref-detail-raw" class="code-block"></p>
+              <div id="ref-detail-edited-box" class="hidden">
+                <h5>Edited Text</h5>
+                <p id="ref-detail-edited" class="code-block"></p>
+              </div>
+              <h5>Source Spans</h5>
+              <div id="ref-detail-spans" class="meta-box"></div>
+            </div>
+
+            <!-- Resolved Work Metadata -->
+            <div class="detail-section mt-2">
+              <h4>Work Metadata</h4>
+              <div id="ref-detail-work" class="meta-box">No work metadata resolved.</div>
+            </div>
+
+            <!-- Interactive Repairs -->
+            <div class="detail-section mt-2">
+              <h4>Repairs and Actions</h4>
+              <div class="actions-wrap">
+                <button type="button" class="btn btn-sm" id="btn-action-edit-text">Edit Text</button>
+                <button type="button" class="btn btn-sm" id="btn-action-split">Split</button>
+                <button type="button" class="btn btn-sm" id="btn-action-merge">Merge</button>
+                <button type="button" class="btn btn-sm" id="btn-action-exclude">Exclude</button>
+                <button type="button" class="btn btn-sm" id="btn-action-restore">Restore</button>
+                <button type="button" class="btn btn-sm" id="btn-action-set-doi">Set DOI</button>
+                <button type="button" class="btn btn-sm" id="btn-action-set-fields">Set Fields</button>
+                <button type="button" class="btn btn-sm" id="btn-action-set-locks">Set Field Locks</button>
+                <button type="button" class="btn btn-sm btn-danger" id="btn-action-mark-unresolved">Mark Unresolved</button>
+                <button type="button" class="btn btn-sm" id="btn-action-attach-file">Attach Local File</button>
+              </div>
+            </div>
+
+            <!-- Candidates Section -->
+            <div class="detail-section mt-2">
+              <h4>Candidates</h4>
+              <div id="ref-detail-candidates" class="candidates-list">No candidates found.</div>
+            </div>
+
+            <!-- Evidence Section -->
+            <div class="detail-section mt-2">
+              <h4>Evidence Records</h4>
+              <div id="ref-detail-evidence" class="meta-box">No evidence records.</div>
+            </div>
+
+            <!-- Access History Section -->
+            <div class="detail-section mt-2">
+              <h4>Access History & Locations</h4>
+              <div id="ref-detail-access" class="meta-box">No access checks recorded.</div>
+            </div>
+
+            <!-- Local Copies & Files -->
+            <div class="detail-section mt-2">
+              <h4>Local Copies & Files</h4>
+              <div id="ref-detail-files" class="meta-box">No local copies attached.</div>
+            </div>
+
+            <!-- Audit Trail & Decisions -->
+            <div class="detail-section mt-2">
+              <h4>Audit History & Decisions</h4>
+              <div id="ref-detail-history" class="meta-box">No audit events recorded.</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- VIEW: ARTIFACTS & EXPORTS -->
+    <section id="view-artifacts" class="view-panel">
+      <div class="panel-header">
+        <h1>Exports & Artifacts</h1>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btn-open-create-export">Create Export</button>
+          <button type="button" class="btn" id="btn-open-draft-requests">Draft Author Requests</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table class="data-table" id="table-artifacts">
+            <thead>
+              <tr>
+                <th>Artifact ID</th>
+                <th>Name</th>
+                <th>Kind</th>
+                <th>Media Type</th>
+                <th>Size (Bytes)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-artifacts">
+              <tr><td colspan="6" class="text-muted">Select a project to view artifacts.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: SETTINGS -->
+    <section id="view-settings" class="view-panel">
+      <div class="panel-header">
+        <h1>Settings</h1>
+        <div class="actions">
+          <span id="settings-revision-badge" class="badge">Revision: -</span>
+          <button type="button" class="btn btn-sm" id="btn-refresh-settings">Refresh Settings</button>
+        </div>
+      </div>
+
+      <div id="settings-warnings-box" class="notice-box notice-warning mb-4 hidden"></div>
+
+      <div class="grid-2">
+        <!-- Global Settings & Forms -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Global Configuration</h3>
+          </div>
+
+          <dl class="meta-list">
+            <dt>Home Directory</dt><dd id="setting-home-val" class="code-inline">-</dd>
+            <dt>Global Downloads</dt><dd id="setting-global-downloads-val">-</dd>
+            <dt>Browser Automation</dt><dd id="setting-browser-val">-</dd>
+            <dt>Enabled Providers</dt><dd id="setting-providers-val">-</dd>
+            <dt>Provider Keys</dt><dd id="setting-keys-status">-</dd>
+            <dt>Limits</dt><dd id="setting-limits-val">-</dd>
+            <dt>MCP Scopes</dt><dd id="setting-mcp-val">-</dd>
+          </dl>
+
+          <!-- Form 1: Set Email -->
+          <div class="settings-form-section mt-4">
+            <h4>Contact Email</h4>
+            <div class="current-setting-value mb-2">Current: <strong id="setting-email-val">None</strong></div>
+            <form id="form-setting-email" class="settings-subform">
+              <div class="form-group-inline">
+                <input type="email" id="setting-input-email" placeholder="user@example.edu" required maxlength="255">
+                <button type="submit" class="btn btn-sm btn-primary">Update Email</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Form 2: Add Allowed Folder -->
+          <div class="settings-form-section mt-4">
+            <h4>Allowed Folders</h4>
+            <ul id="setting-folders-list" class="simple-list mb-2"></ul>
+            <form id="form-setting-folder" class="settings-subform">
+              <div class="form-group-inline">
+                <input type="text" id="setting-input-folder" placeholder="/path/to/papers" required>
+                <button type="submit" class="btn btn-sm btn-primary">Add Folder</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Form 3: Set Provider Key -->
+          <div class="settings-form-section mt-4">
+            <h4>Keyring Provider Keys (Write-Only)</h4>
+            <p class="text-muted text-sm">Stored in system keyring. Never logged, never displayed.</p>
+            <form id="form-setting-key" class="settings-subform">
+              <div class="form-group">
+                <label for="setting-input-provider">Provider:
+                  <select id="setting-input-provider" required>
+                    <option value="openalex_key">OpenAlex API Key (openalex_key)</option>
+                    <option value="s2_key">Semantic Scholar API Key (s2_key)</option>
+                  </select>
+                </label>
+              </div>
+              <div class="form-group-inline">
+                <input type="password" id="setting-input-key" placeholder="Enter API Key..." required autocomplete="off">
+                <button type="submit" class="btn btn-sm btn-primary">Save Key</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Form 4: PDF Fallback URL -->
+          <div class="settings-form-section mt-4">
+            <h4>PDF Fallback Template</h4>
+            <div class="current-setting-value mb-2">Current: <strong id="setting-fallback-val">Off</strong></div>
+            <form id="form-setting-fallback" class="settings-subform">
+              <div class="form-group-inline">
+                <select id="setting-input-fallback-preset">
+                  <option value="off">Off (Disabled)</option>
+                  <option value="box">Preset: box</option>
+                  <option value="su">Preset: su</option>
+                  <option value="st">Preset: st</option>
+                  <option value="ru">Preset: ru</option>
+                  <option value="custom">Custom URL template</option>
+                </select>
+                <input type="text" id="setting-input-fallback-custom" placeholder="https://example.org/{doi}" class="hidden">
+                <button type="submit" class="btn btn-sm btn-primary">Update Fallback</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Project Settings & Forms -->
+        <div>
+          <div class="card" id="settings-project-card">
+            <div class="card-header">
+              <h3>Target Project Settings</h3>
+              <span id="settings-project-badge" class="badge">No Project</span>
+            </div>
+
+            <div id="settings-project-empty" class="text-muted py-4">
+              Select an active project in the header to view and edit project-scoped settings.
+            </div>
+
+            <div id="settings-project-content" class="hidden">
+              <dl class="meta-list">
+                <dt>Network Mode</dt><dd id="setting-proj-network-val">-</dd>
+                <dt>Project Download Grant</dt><dd id="setting-proj-downloads-val">-</dd>
+                <dt>Effective Download Grant</dt><dd id="setting-proj-effective-download" class="badge badge-ok">-</dd>
+                <dt>Version Policy</dt><dd id="setting-proj-version-policy-val">-</dd>
+              </dl>
+
+              <!-- Form 5: Project Network Mode -->
+              <div class="settings-form-section mt-4">
+                <h4>Project Network Mode</h4>
+                <form id="form-setting-proj-network" class="settings-subform">
+                  <div class="form-group-inline">
+                    <select id="setting-input-proj-network" required>
+                      <option value="offline">offline</option>
+                      <option value="metadata">metadata</option>
+                      <option value="retrieval">retrieval</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Update Network</button>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Form 6: Project Downloads -->
+              <div class="settings-form-section mt-4">
+                <h4>Project Download Grant</h4>
+                <p class="text-muted text-sm">Turning off project grant does not revoke retrieval if global grant is enabled.</p>
+                <form id="form-setting-proj-downloads" class="settings-subform">
+                  <div class="form-group-inline">
+                    <select id="setting-input-proj-downloads" required>
+                      <option value="true">Enabled</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Update Grant</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- CLI Only Settings Card -->
+          <div class="card mt-4">
+            <div class="card-header">
+              <h3>CLI-Only Configuration</h3>
+            </div>
+            <p class="text-muted text-md">
+              The following settings are read-only in the web application:
+            </p>
+            <ul class="simple-list text-muted text-sm">
+              <li><strong>Executable Paths:</strong> <code>pdf-browser</code> executable binary paths remain CLI-only.</li>
+              <li><strong>Provider Lists & MCP Scopes:</strong> Provider registries and MCP authorization scopes cannot be modified via web.</li>
+              <li><strong>Global Download Master Switch:</strong> Global download grant is configured via CLI.</li>
+              <li><strong>Arbitrary Settings Dictionaries:</strong> Generic unstructured writes are forbidden.</li>
+            </ul>
+            <h4 class="mt-2 text-sm">CLI Reference Commands</h4>
+            <pre class="code-block"><code>refcollector config show
+refcollector config pdf-browser python3 --binary /path/to/chromium</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  </div>
+
+  <!-- MODALS CONTAINER -->
+  <div id="modal-backdrop" class="modal-backdrop hidden"></div>
+
+  <!-- Modal: Create Project -->
+  <dialog id="modal-create-project" class="app-dialog">
+    <div class="dialog-header">
+      <h3>Create New Project</h3>
+      <button type="button" class="btn-close" data-close="modal-create-project">&times;</button>
+    </div>
+    <form id="form-create-project">
+      <div class="form-group">
+        <label for="create-proj-name">Project Name (Required)
+          <input type="text" id="create-proj-name" required minlength="1" maxlength="200" placeholder="e.g. Thesis References">
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="create-proj-profile">Policy Profile
+          <select id="create-proj-profile">
+            <option value="default">default</option>
+            <option value="strict">strict</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="create-proj-version-policy">Version Policy
+          <select id="create-proj-version-policy">
+            <option value="any_eligible">any_eligible</option>
+            <option value="prefer_published">prefer_published</option>
+            <option value="cited_version_only">cited_version_only</option>
+          </select>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-create-project">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Import Source -->
+  <dialog id="modal-import-source" class="app-dialog">
+    <div class="dialog-header">
+      <h3>Import Reference Source</h3>
+      <button type="button" class="btn-close" data-close="modal-import-source">&times;</button>
+    </div>
+    <form id="form-import-source">
+      <div class="form-group">
+        <label>Input Type:
+          <select id="import-source-type">
+            <option value="text">Pasted Text</option>
+            <option value="local_file">Approved Local File Path</option>
+            <option value="browser_upload">Browser PDF Upload</option>
+          </select>
+        </label>
+      </div>
+      <div id="import-type-text-group" class="form-group">
+        <label for="import-source-text">Raw References Text
+          <textarea id="import-source-text" rows="8" placeholder="Paste citations or reference list here..."></textarea>
+        </label>
+        <label for="import-source-text-label" class="mt-2">Label (Optional)
+          <input type="text" id="import-source-text-label" placeholder="e.g. Chapter 4 bibliography">
+        </label>
+      </div>
+      <div id="import-type-file-group" class="form-group hidden">
+        <label for="import-source-path">Local File Path (Must be in allowed folders)
+          <input type="text" id="import-source-path" placeholder="e.g. /home/user/papers/paper.pdf">
+        </label>
+      </div>
+      <div id="import-type-upload-group" class="form-group hidden">
+        <label for="import-source-file">PDF Document (Required)
+          <input type="file" id="import-source-file" accept="application/pdf,.pdf">
+        </label>
+        <span class="text-muted text-sm">File size will be validated against server byte limits.</span>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-import-source">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-import">Import</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Start Job -->
+  <dialog id="modal-start-job" class="app-dialog">
+    <div class="dialog-header">
+      <h3>Start Pipeline Job</h3>
+      <button type="button" class="btn-close" data-close="modal-start-job">&times;</button>
+    </div>
+    <form id="form-start-job">
+      <div class="form-group">
+        <label>Stages to execute:</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" name="job-stage" value="extract" checked> 1. Extract References</label>
+          <label><input type="checkbox" name="job-stage" value="resolve" checked> 2. Resolve Metadata</label>
+          <label><input type="checkbox" name="job-stage" value="discover_access" checked> 3. Discover Access</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="start-job-scope-type">Scope Type:
+          <select id="start-job-scope-type">
+            <option value="source">Source Scope</option>
+            <option value="occurrence">Occurrence Scope</option>
+          </select>
+        </label>
+      </div>
+      <div id="job-scope-source-group" class="form-group">
+        <label for="start-job-source-id">Select Source:
+          <select id="start-job-source-id"></select>
+        </label>
+      </div>
+      <div id="job-scope-occ-group" class="form-group hidden">
+        <label for="start-job-occ-ids">Occurrence IDs (comma-separated):
+          <input type="text" id="start-job-occ-ids" placeholder="e.g. 01J..., 01J...">
+        </label>
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="start-job-refresh"> Force Refresh Cached Results</label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-start-job">Cancel</button>
+        <button type="submit" class="btn btn-primary">Start Job</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Add Reference -->
+  <dialog id="modal-add-reference" class="app-dialog">
+    <div class="dialog-header">
+      <h3>Add Manual Reference</h3>
+      <button type="button" class="btn-close" data-close="modal-add-reference">&times;</button>
+    </div>
+    <form id="form-add-reference">
+      <div class="form-group">
+        <label for="add-ref-source-id">Source:
+          <select id="add-ref-source-id" required></select>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="add-ref-text">Citation Text (Required):
+          <textarea id="add-ref-text" rows="4" required minlength="1" maxlength="4000" placeholder="Full citation string..."></textarea>
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="add-ref-after-id">Insert After Occurrence ID (Optional):
+          <input type="text" id="add-ref-after-id" placeholder="Leave empty to append at end">
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-add-reference">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Repair Generic Form -->
+  <dialog id="modal-repair-reference" class="app-dialog">
+    <div class="dialog-header">
+      <h3 id="modal-repair-title">Repair Reference</h3>
+      <button type="button" class="btn-close" data-close="modal-repair-reference">&times;</button>
+    </div>
+    <form id="form-repair-reference">
+      <div id="repair-conflict-alert" class="notice-box notice-warning mb-2 hidden"></div>
+      <div id="repair-fields-container"></div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-repair-reference">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Repair</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Scratch Resolve -->
+  <dialog id="modal-scratch-resolve" class="app-dialog">
+    <div class="dialog-header">
+      <h3>Scratch Citation Resolver</h3>
+      <button type="button" class="btn-close" data-close="modal-scratch-resolve">&times;</button>
+    </div>
+    <form id="form-scratch-resolve">
+      <div class="form-group">
+        <label for="scratch-citation-text">Freeform Citation Text:
+          <textarea id="scratch-citation-text" rows="3" placeholder="Paste citation to look up online..."></textarea>
+        </label>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="scratch-title">Title (Optional):
+            <input type="text" id="scratch-title">
+          </label>
+        </div>
+        <div class="form-group">
+          <label for="scratch-year">Year (Optional):
+            <input type="number" id="scratch-year">
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="scratch-authors">Authors (comma-separated, optional):
+          <input type="text" id="scratch-authors" placeholder="e.g. Smith, John; Doe, Jane">
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-scratch-resolve">Close</button>
+        <button type="submit" class="btn btn-primary">Resolve</button>
+      </div>
+    </form>
+    <div id="scratch-results-container" class="mt-4 hidden">
+      <h4>Resolution Hint: <span id="scratch-hint-badge" class="badge"></span></h4>
+      <div id="scratch-candidates-list" class="candidates-list mt-2"></div>
+    </div>
+  </dialog>
+
+  <!-- Modal: Create Export -->
+  <dialog id="modal-create-export" class="app-dialog">
+    <div class="dialog-header">
+      <h3>Create Export</h3>
+      <button type="button" class="btn-close" data-close="modal-create-export">&times;</button>
+    </div>
+    <form id="form-create-export">
+      <div class="form-group">
+        <label>Export Formats:</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" name="export-format" value="bibtex" checked> BibTeX (.bib)</label>
+          <label><input type="checkbox" name="export-format" value="csl_json" checked> CSL JSON (.json)</label>
+          <label><input type="checkbox" name="export-format" value="csv" checked> CSV (.csv)</label>
+          <label><input type="checkbox" name="export-format" value="json"> JSON (.json)</label>
+          <label><input type="checkbox" name="export-format" value="unresolved"> Unresolved report (.txt)</label>
+          <label><input type="checkbox" name="export-format" value="audit_report"> Audit report (.json)</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="export-selection">Selection Scope:
+          <select id="export-selection">
+            <option value="accepted">Accepted references only</option>
+            <option value="reviewed">Reviewed and accepted</option>
+            <option value="complete_audit">Complete audit (all occurrences)</option>
+          </select>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-create-export">Cancel</button>
+        <button type="submit" class="btn btn-primary">Queue Export Job</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: Draft Author Requests -->
+  <dialog id="modal-draft-requests" class="app-dialog">
+    <div class="dialog-header">
+      <h3>Draft Author Requests</h3>
+      <button type="button" class="btn-close" data-close="modal-draft-requests">&times;</button>
+    </div>
+    <form id="form-draft-requests">
+      <div class="form-group">
+        <label for="draft-sender-name">Your Full Name (Required):
+          <input type="text" id="draft-sender-name" required minlength="1" maxlength="200" placeholder="e.g. Dr. Jane Doe">
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="draft-sender-affiliation">Affiliation (Optional):
+          <input type="text" id="draft-sender-affiliation" maxlength="300" placeholder="e.g. Department of Computer Science, University of X">
+        </label>
+      </div>
+      <div class="form-group">
+        <label for="draft-sender-purpose">Purpose (Optional):
+          <input type="text" id="draft-sender-purpose" maxlength="500" placeholder="e.g. academic research for doctoral dissertation">
+        </label>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="draft-language">Language:
+            <select id="draft-language">
+              <option value="en">English (en)</option>
+              <option value="id">Indonesian (id)</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="draft-group-authors"> Group by primary author</label>
+        </div>
+      </div>
+      <div class="notice-box mt-2">
+        Generates neutral editable text artifacts with blank recipients. Does not transmit emails.
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-draft-requests">Cancel</button>
+        <button type="submit" class="btn btn-primary">Queue Draft Job</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal: View Text Artifact -->
+  <dialog id="modal-view-artifact" class="app-dialog dialog-lg">
+    <div class="dialog-header">
+      <h3 id="artifact-modal-title">Artifact Preview</h3>
+      <button type="button" class="btn-close" data-close="modal-view-artifact">&times;</button>
+    </div>
+    <div class="artifact-content-container">
+      <pre id="artifact-text-content" class="code-block"></pre>
+    </div>
+    <div class="dialog-actions">
+      <span id="artifact-pagination-info" class="text-muted"></span>
+      <button type="button" class="btn-sm hidden" id="btn-artifact-read-more">Read More (Next 64KB)</button>
+      <button type="button" class="btn" data-close="modal-view-artifact">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Modal: Safe Raster Page Preview -->
+  <dialog id="modal-preview-page" class="app-dialog dialog-lg">
+    <div class="dialog-header">
+      <h3 id="modal-preview-title">Source Page Preview</h3>
+      <button type="button" class="btn-close" data-close="modal-preview-page">&times;</button>
+    </div>
+    <div class="raster-modal-body">
+      <div class="raster-modal-controls mb-2">
+        <button type="button" class="btn btn-sm" id="btn-modal-preview-prev">Previous Page</button>
+        <span id="modal-preview-page-indicator" class="text-muted">Page 0</span>
+        <button type="button" class="btn btn-sm" id="btn-modal-preview-next">Next Page</button>
+        <label class="project-selector-label" for="modal-preview-scale-select">Scale:
+          <select id="modal-preview-scale-select" aria-label="Modal Preview Scale">
+            <option value="1">100%</option>
+            <option value="0.75">75%</option>
+            <option value="1.25">125%</option>
+            <option value="1.5">150%</option>
+            <option value="2">200%</option>
+            <option value="0.5">50%</option>
+          </select>
+        </label>
+      </div>
+      <div id="modal-preview-status" class="notice-box text-muted hidden"></div>
+      <div id="modal-preview-stage" class="raster-stage-container">
+        <div id="modal-preview-viewport" class="raster-viewport">
+          <img id="modal-preview-img" alt="Safe source page raster" class="raster-img">
+          <div id="modal-preview-overlays" class="raster-overlays"></div>
+        </div>
+      </div>
+      <div id="modal-preview-citation" class="meta-box mt-2" aria-live="polite">
+        <strong>Citation:</strong> <span id="modal-preview-citation-text">-</span>
+        <div id="modal-preview-span-info" class="text-muted mt-1"></div>
+      </div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-close="modal-preview-page">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Modal: Two-Step Intent Confirmation -->
+  <dialog id="modal-confirm-intent" class="app-dialog">
+    <div class="dialog-header">
+      <h3 id="intent-modal-title">Confirm Action</h3>
+      <button type="button" class="btn-close" data-close="modal-confirm-intent">&times;</button>
+    </div>
+    <div class="intent-modal-body">
+      <div class="intent-header-row mb-2">
+        <span id="intent-purpose-badge" class="badge">INTENT</span>
+        <span id="intent-expiry-text" class="text-muted text-sm"></span>
+      </div>
+      <div id="intent-summary-container" class="meta-box mb-3"></div>
+      <div class="notice-box notice-warning mb-2 hidden" id="intent-notice-box"></div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn" id="btn-cancel-intent" data-close="modal-confirm-intent">Cancel</button>
+      <button type="button" class="btn btn-primary" id="btn-confirm-intent-action">Confirm Action</button>
+    </div>
+  </dialog>
+
+  <!-- Modal: Trusted Review Preparation -->
+  <dialog id="modal-review-intent" class="app-dialog">
+    <div class="dialog-header">
+      <h3 id="review-modal-title">Trusted Reference Review</h3>
+      <button type="button" class="btn-close" data-close="modal-review-intent">&times;</button>
+    </div>
+    <form id="form-review-intent">
+      <div class="meta-box mb-3">
+        <div><strong>Action:</strong> <span id="review-action-badge" class="badge"></span></div>
+        <div class="mt-2"><strong>Candidate:</strong> <span id="review-candidate-title"></span></div>
+        <div class="mt-1 text-muted" id="review-candidate-reasons"></div>
+        <div class="mt-2"><strong>Expected Revision:</strong> <span id="review-expected-rev" class="badge"></span></div>
+      </div>
+      <div class="form-group">
+        <label for="review-intent-note">Audit Note (Optional):
+          <input type="text" id="review-intent-note" placeholder="Reason for this decision..." maxlength="500">
+        </label>
+      </div>
+      <div class="notice-box mb-2 text-sm">
+        Accepting records a revision-bound human review approval (accepted_user) via WEB_UI surface.
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn" data-close="modal-review-intent">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-review-intent">Prepare Review Intent</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

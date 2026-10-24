@@ -107,12 +107,12 @@ def test_cannot_upgrade_deferred_transaction(db):
 # ---------- domain ----------
 
 
-def test_p1_values_absent_from_p0_enums():
+def test_unapproved_p1_values_remain_absent_after_d38_web_channel():
     assert "doi" not in {s.value for s in enums.SourceType}
     assert "contexts" not in {s.value for s in enums.Stage}
     assert "zotero_attachment" not in {s.value for s in enums.LocalCopyOrigin}
     assert "RETRACTED" not in {s.value for s in enums.ReasonCode}
-    assert "web_ui" not in {s.value for s in enums.Channel}
+    assert enums.Channel.WEB_UI.value == "web_ui"  # D-38 permits ordinary web provenance only.
     assert {"ris", "obsidian"}.isdisjoint({s.value for s in enums.ExportFormat})
 
 

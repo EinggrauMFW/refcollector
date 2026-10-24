@@ -58,6 +58,29 @@ def normalize_isbn(value: str) -> str | None:
     return None
 
 
+def unique_doi(text: str | None) -> str | None:
+    """Return a DOI only when every explicit DOI span normalizes to the same value."""
+    text = unquote(text or "").replace("\u00ad", "")
+    text = re.sub(r"(\S)[ \t]*\r?\n[ \t]*(?=[./_-])", r"\1", text)
+    text = re.sub(r"([./_-])[ \t]*\r?\n[ \t]*(?=[a-z0-9])", r"\1", text)
+    starts = list(
+        re.finditer(
+            r"(?:\bdoi\b\s*:?\s*|(?:https?://)?(?:dx\.)?doi\.org/\s*)10\s*\.\s*\d{4,9}\s*/"
+            r"|\b10\.\d{4,9}/",
+            text,
+            re.I,
+        )
+    )
+    values = set()
+    for index, match in enumerate(starts):
+        end = starts[index + 1].start() if index + 1 < len(starts) else len(text)
+        value = normalize_doi(text[match.start() : end])
+        if value is None:
+            return None
+        values.add(value)
+    return next(iter(values)) if len(values) == 1 else None
+
+
 def read_identifiers(text: str | None) -> dict[IdentifierKind, str]:
     """Read explicit identifiers. Bare years or numeric strings are not PMIDs/ISBNs."""
     text = text or ""
