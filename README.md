@@ -15,6 +15,26 @@ installation passed the CLI smoke test. Public package release on PyPI remains
 pending the quality benchmark and final release review. Installation below uses
 the tagged source release.
 
+## Interface preview
+
+Screenshots below show the running local app with illustrative demo references.
+They do not represent measured research results.
+
+Architecture: [MCP integration](#mcp-integration-and-engine-architecture) and
+[web workflow](#web-system-architecture-and-staged-verification).
+
+### Library interface
+
+![Refcollector Library UI](docs/images/library-ui-preview.png)
+
+*Library: an expanded paper, its citations, and review and download controls.*
+
+### Advanced dashboard
+
+![Refcollector Advanced Dashboard](docs/images/advanced-dashboard-preview.png)
+
+*Advanced: reference filters and per-citation extraction, identity and access states.*
+
 ## Features
 
 - Import PDFs with a text layer or paste reference text.
@@ -271,6 +291,30 @@ locally and append `"files:download"` to its `mcp_scopes` list, retaining the ot
 entries. Restart the server after editing. The current server uses stdio, not a
 hosted HTTP endpoint.
 
+### MCP integration and engine architecture
+
+The stdio MCP server integrates directly with RefCollector's shared service layer
+and local storage engine:
+
+```mermaid
+flowchart LR
+    Host["MCP client or LLM host"] <-->|"stdio tool calls and results"| MCP["RefCollector MCP server"]
+    Config["Trusted local configuration"] --> Guard["Tool schemas, scopes and project grants"]
+    MCP --> Guard --> Service["Shared application services"]
+    CLI["CLI"] --> Service
+    Web["Local web API"] --> Service
+    Human["Human review in terminal or web UI"] --> Service
+    Service --> Jobs["Job queue and executor"]
+    Jobs <-->|"Permitted network requests"| Providers["Metadata providers and configured PDF sources"]
+    Jobs --> Verify["Extraction, identity and PDF checks"]
+    Service <--> Store[("RC_HOME: SQLite, files, cache and audit trail")]
+    Verify --> Store
+```
+
+MCP uses stdio, not an HTTP endpoint. Trusted local settings control its scopes;
+an agent cannot enable its own download access or record a human approval.
+CLI, web and MCP use the same services and data home.
+
 ## Settings, storage and credentials
 
 `RC_HOME` selects the application data folder. Without it, Refcollector uses the
@@ -474,6 +518,37 @@ PDF's reference list does not establish that the PDF is the requested paper.
 The engine store under `RC_HOME` remains authoritative. The collection folder is
 a derived copy. If a card says **Not in folder**, check folder access and retry sync.
 For status descriptions and troubleshooting, see the [user guide](docs/USER_GUIDE.md).
+
+### Web system architecture and staged verification
+
+The local web interface connects to a loopback FastAPI application backed by the
+shared service engine. PDF verification remains strictly decoupled from metadata approval:
+
+```mermaid
+flowchart TD
+    UI["Library / and Advanced /advanced"] -->|"Loopback HTTP"| API["FastAPI: Host, Origin, session and CSRF guards"]
+    API --> Service["Shared services and job executor"]
+    Service <--> Store[("RC_HOME: SQLite, CAS files, cache and audit")]
+    Service --> DOI["DOI-first: one clear cited DOI"]
+    Service --> Metadata["Metadata lookup and candidate review"]
+    Metadata --> Accepted["Accepted work: normal download path"]
+    DOI --> Transfer["Granted retrieval, limits and staged download"]
+    Accepted --> Transfer
+    Transfer --> Checks{"PDF safety, identity and version checks"}
+    Checks -->|"Malformed or unsafe"| Reject["Reject; no approval override"]
+    Checks -->|"Reviewable identity or version evidence"| Pending["needs_review"]
+    Pending --> Review["Two-step human file approval or rejection"]
+    Review -->|"Approve current, valid file"| Verified["Verified PDF"]
+    Review -->|"Reject"| Reject
+    Checks -->|"Pass"| Verified
+    Verified --> Viewer["Shelf and guarded PDF viewer"]
+    Verified --> Folder["Copy to the granted collection folder"]
+```
+
+The port shown in the startup instructions is configurable. DOI-first retrieval
+does not require metadata confirmation, but every downloaded PDF still receives
+file checks. Reviewable files require a separate confirmation; malformed or unsafe
+files cannot be approved.
 
 ### Advanced dashboard workflow
 
